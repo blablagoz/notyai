@@ -6,7 +6,7 @@ class GeminiAIService {
   // Google AI Studio'dan alacağınız ücretsiz API Anahtarı
   final String _apiKey;
 
-  GeminiAIService({String apiKey = "YOUR_GEMINI_API_KEY"}) : _apiKey = apiKey;
+  GeminiAIService({String apiKey = "AQ.Ab8RN6JzE_wOh9GaNtQOUVSJZEdQ_pUddojV4XZKfsKEPUFm9g"}) : _apiKey = apiKey;
 
   Future<ParsedEventModel?> parseNaturalLanguageInput(String userInput) async {
     final now = DateTime.now();

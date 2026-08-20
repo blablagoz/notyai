@@ -1,0 +1,6 @@
+{
+  "name": "NotyAI",
+  "description": "Ses Odaklı Akıllı Ajanda, Türkçe Doğal Dil Asistanı ve Takvim/Ekip Yönetim Platformu",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

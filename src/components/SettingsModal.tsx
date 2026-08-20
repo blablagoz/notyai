@@ -1,0 +1,258 @@
+import React from 'react';
+import { X, CheckCircle2, Download, Sparkles, Moon, Sun, Bell, Volume2, ShieldCheck } from 'lucide-react';
+import { AppThemeMode, CalendarEvent } from '../types';
+import { ThemeColors } from '../theme';
+
+interface SettingsModalProps {
+  currentTheme: AppThemeMode;
+  onThemeChange: (mode: AppThemeMode) => void;
+  theme: ThemeColors;
+  events: CalendarEvent[];
+  onClose: () => void;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  currentTheme,
+  onThemeChange,
+  theme,
+  events,
+  onClose,
+}) => {
+  const exportICS = () => {
+    // Generate standard .ics (iCalendar) format
+    let icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//NotyAI//TR',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+    ];
+
+    events.forEach((event) => {
+      const formatIcsDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      };
+
+      icsContent.push('BEGIN:VEVENT');
+      icsContent.push(`UID:${event.id}@notyai.app`);
+      icsContent.push(`DTSTAMP:${formatIcsDate(new Date().toISOString())}`);
+      icsContent.push(`DTSTART:${formatIcsDate(event.startTime)}`);
+      icsContent.push(`DTEND:${formatIcsDate(event.endTime)}`);
+      icsContent.push(`SUMMARY:${event.title}`);
+      if (event.description) icsContent.push(`DESCRIPTION:${event.description}`);
+      if (event.location) icsContent.push(`LOCATION:${event.location}`);
+      icsContent.push('STATUS:CONFIRMED');
+      icsContent.push('END:VEVENT');
+    });
+
+    icsContent.push('END:VCALENDAR');
+
+    const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'notyai_takvim_aktarimi.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div
+        className="w-full max-w-lg rounded-3xl border p-6 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
+        style={{
+          backgroundColor: theme.panel,
+          borderColor: theme.border,
+        }}
+      >
+        {/* Modal Handle & Header */}
+        <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: theme.border }}>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl" style={{ backgroundColor: `${theme.accent}20`, color: theme.accent }}>
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold" style={{ color: theme.textPrimary }}>
+                Uygulama Tercihleri
+              </h3>
+              <p className="text-xs" style={{ color: theme.textMuted }}>
+                NotyAI Sistem & Görünüm Yapılandırması
+              </p>
+            </div>
+          </div>
+
+          <button
+            id="close-settings-modal-btn"
+            onClick={onClose}
+            aria-label="Kapat"
+            className="p-2 rounded-xl transition-colors hover:opacity-80"
+            style={{ backgroundColor: theme.card, color: theme.textMuted }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* 1. Theme Selection */}
+        <div className="mt-5">
+          <label className="text-[11px] font-bold tracking-widest uppercase block mb-3" style={{ color: theme.textSubtle }}>
+            TEMA SEÇİMİ
+          </label>
+          <div className="grid grid-cols-3 gap-2.5">
+            {/* Obsidian */}
+            <button
+              id="theme-btn-obsidian"
+              onClick={() => onThemeChange('obsidian')}
+              className="p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer group border"
+              style={{
+                backgroundColor: '#0D1014',
+                borderColor: currentTheme === 'obsidian' ? '#00F2DE' : '#2C3644',
+                boxShadow: currentTheme === 'obsidian' ? '0 0 16px rgba(0, 242, 222, 0.35)' : 'none',
+              }}
+            >
+              <div className="w-4 h-4 rounded-full mb-2 bg-[#00F2DE]" />
+              <span className="text-xs font-bold text-slate-100">Obsidyen</span>
+              <span className="text-[10px] text-slate-400">Titanyum</span>
+            </button>
+
+            {/* Petrol */}
+            <button
+              id="theme-btn-petrol"
+              onClick={() => onThemeChange('petrol')}
+              className="p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer group border"
+              style={{
+                backgroundColor: '#091212',
+                borderColor: currentTheme === 'petrol' ? '#10F0D2' : '#24403D',
+                boxShadow: currentTheme === 'petrol' ? '0 0 16px rgba(16, 240, 210, 0.35)' : 'none',
+              }}
+            >
+              <div className="w-4 h-4 rounded-full mb-2 bg-[#10F0D2]" />
+              <span className="text-xs font-bold text-teal-100">Gece</span>
+              <span className="text-[10px] text-teal-400">Petrolü</span>
+            </button>
+
+            {/* Light */}
+            <button
+              id="theme-btn-light"
+              onClick={() => onThemeChange('light')}
+              className="p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer group border"
+              style={{
+                backgroundColor: '#F8FAFC',
+                borderColor: currentTheme === 'light' ? '#0284C7' : '#E2E8F0',
+                boxShadow: currentTheme === 'light' ? '0 0 16px rgba(2, 132, 199, 0.35)' : 'none',
+              }}
+            >
+              <div className="w-4 h-4 rounded-full mb-2 bg-[#0284C7]" />
+              <span className="text-xs font-bold text-slate-900">Aydınlık</span>
+              <span className="text-[10px] text-slate-600">Arı Beyaz</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2. Notification Architecture */}
+        <div className="mt-6">
+          <label className="text-[11px] font-bold tracking-widest uppercase block mb-3" style={{ color: theme.textSubtle }}>
+            BİLDİRİM MİMARİSİ (3 KADEMELİ AKILLI DÖNGÜ)
+          </label>
+          <div className="space-y-2.5">
+            <div className="p-3.5 rounded-2xl border flex items-center justify-between" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-400">
+                  <Moon size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
+                    Gece 00:00 Günün Özeti
+                  </h4>
+                  <p className="text-[11px]" style={{ color: theme.textMuted }}>
+                    Kilit ekranında sabit brifing ve sonraki gün hazırlığı
+                  </p>
+                </div>
+              </div>
+              <CheckCircle2 size={18} style={{ color: theme.accent }} />
+            </div>
+
+            <div className="p-3.5 rounded-2xl border flex items-center justify-between" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-amber-500/10 text-amber-400">
+                  <Sun size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
+                    Sabah 07:00 Güne Başlama
+                  </h4>
+                  <p className="text-[11px]" style={{ color: theme.accent }}>
+                    Yukarıdan düşen sesli banner & motivasyon
+                  </p>
+                </div>
+              </div>
+              <CheckCircle2 size={18} style={{ color: theme.accent }} />
+            </div>
+
+            <div className="p-3.5 rounded-2xl border flex items-center justify-between" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-emerald-500/10 text-emerald-400">
+                  <Bell size={16} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
+                    T-60 Dakika Öncesi Hatırlatıcı
+                  </h4>
+                  <p className="text-[11px]" style={{ color: theme.textMuted }}>
+                    Trafik, yol ve hazırlık tampon uyarısı
+                  </p>
+                </div>
+              </div>
+              <CheckCircle2 size={18} style={{ color: theme.accent }} />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Calendar Sync (.ICS Export) */}
+        <div className="mt-6">
+          <label className="text-[11px] font-bold tracking-widest uppercase block mb-3" style={{ color: theme.textSubtle }}>
+            CİHAZ TAKVİMİ SENKRONİZASYONU
+          </label>
+          <div className="p-4 rounded-2xl border flex items-center justify-between gap-3" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+            <div>
+              <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
+                iCalendar (.ICS) Takvim İçe/Dışa Aktarma
+              </h4>
+              <p className="text-[11px]" style={{ color: theme.textMuted }}>
+                Apple Calendar, Google Takvim, Outlook ve Samsung Takvim ile %100 uyumlu
+              </p>
+            </div>
+
+            <button
+              id="export-ics-btn"
+              onClick={exportICS}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold shrink-0 transition-all hover:scale-105"
+              style={{
+                backgroundColor: theme.accent,
+                color: theme.bg,
+              }}
+            >
+              <Download size={14} />
+              <span>İndir (.ics)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 4. AI Engine Status */}
+        <div className="mt-6 pt-4 border-t flex items-center justify-between" style={{ borderColor: theme.border }}>
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} style={{ color: theme.accent }} />
+            <span className="text-xs font-semibold" style={{ color: theme.textMuted }}>
+              Gemini 2.5 Flash Doğal Dil Motoru Aktif
+            </span>
+          </div>
+          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded" style={{ backgroundColor: `${theme.accent}15`, color: theme.accent }}>
+            v1.0.0
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -6,6 +6,9 @@ on:
       - cowork/android-apk
   workflow_dispatch: {}
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -130,4 +133,3 @@ jobs:
         with:
           name: notyai-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
-

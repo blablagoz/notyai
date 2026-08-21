@@ -1,0 +1,133 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches:
+      - cowork/android-apk
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Build web assets
+        run: npx vite build
+
+      - name: Scaffold Android platform (Capacitor)
+        run: npx cap add android
+
+      - name: Sync web assets into Android project
+        run: npx cap sync android
+
+      - name: Add microphone permission to AndroidManifest.xml
+        run: |
+          python3 - <<'PY'
+          p = "android/app/src/main/AndroidManifest.xml"
+          s = open(p).read()
+          old = '<uses-permission android:name="android.permission.INTERNET" />'
+          new = old + '\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />'
+          assert old in s, "INTERNET permission line not found in manifest"
+          s = s.replace(old, new)
+          open(p, "w").write(s)
+          print("Manifest patched OK")
+          PY
+
+      - name: Add microphone permission handling to MainActivity
+        run: |
+          mkdir -p android/app/src/main/java/com/notyai/app
+          cat > android/app/src/main/java/com/notyai/app/MainActivity.java <<'JAVA'
+          package com.notyai.app;
+
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+          import android.os.Bundle;
+          import android.webkit.PermissionRequest;
+          import android.webkit.WebChromeClient;
+          import androidx.core.app.ActivityCompat;
+          import androidx.core.content.ContextCompat;
+
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+
+              private static final int MIC_PERMISSION_REQUEST_CODE = 1001;
+
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                          != PackageManager.PERMISSION_GRANTED) {
+                      ActivityCompat.requestPermissions(
+                              this,
+                              new String[] {Manifest.permission.RECORD_AUDIO},
+                              MIC_PERMISSION_REQUEST_CODE);
+                  }
+
+                  this.bridge.getWebView().setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onPermissionRequest(final PermissionRequest request) {
+                          runOnUiThread(() -> {
+                              if (ContextCompat.checkSelfPermission(
+                                      MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                                      == PackageManager.PERMISSION_GRANTED) {
+                                  request.grant(request.getResources());
+                              } else {
+                                  request.deny();
+                              }
+                          });
+                      }
+                  });
+              }
+          }
+          JAVA
+
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Publish APK to apk-output branch
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          echo "Found APK at $APK_PATH"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout --orphan apk-output-tmp
+          git reset --hard
+          cp "$APK_PATH" notyai-debug.apk
+          git add notyai-debug.apk
+          git commit -m "Build debug APK from ${{ github.sha }}"
+          git branch -f apk-output apk-output-tmp
+          git push origin apk-output --force
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notyai-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+

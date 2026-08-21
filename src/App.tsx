@@ -144,9 +144,13 @@ export function App() {
           weekday: 'long',
         });
 
-        const res = await fetch('/api/daily-briefing', {
+                const res = await fetch('https://ujwlgblxgorufxikwqjp.supabase.co/functions/v1/daily-briefing', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer sb_publishable_4HPTSWDpGqCmDbdCHCAa-Q_V9GGFrxP',
+            'apikey': 'sb_publishable_4HPTSWDpGqCmDbdCHCAa-Q_V9GGFrxP',
+          },
           body: JSON.stringify({ events: dayEvents, dateStr }),
         });
         const data = await res.json();
@@ -204,9 +208,13 @@ export function App() {
     setLiveTranscript(commandText);
 
     try {
-      const response = await fetch('/api/parse-event', {
+            const response = await fetch('https://ujwlgblxgorufxikwqjp.supabase.co/functions/v1/parse-event', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer sb_publishable_4HPTSWDpGqCmDbdCHCAa-Q_V9GGFrxP',
+          'apikey': 'sb_publishable_4HPTSWDpGqCmDbdCHCAa-Q_V9GGFrxP',
+        },
         body: JSON.stringify({
           userInput: commandText,
           referenceTime: selectedDate.toISOString(),

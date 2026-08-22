@@ -18,3 +18,13 @@ View your app in AI Studio: https://ai.studio/apps/56f52b82-93d0-4bbe-9b0f-09d11
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Build a debug Android APK
+
+Prerequisites: Node.js 22 or newer, JDK 21, and Android SDK 36.
+
+1. Install dependencies: `bun install`
+2. Build the web app, sync it to Android, and create the APK:
+   `bun run android:apk`
+
+The APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk`.

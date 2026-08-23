@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Mail, Lock, User, Sparkles } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { oauthRedirectUrl, supabase, supabasePublishableKey, supabaseUrl } from '../lib/supabase';
 import { signInWithGoogle } from '../services/auth';
-import { oauthRedirectUrl } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
 import { ThemeColors } from '../theme';
 
@@ -13,6 +12,14 @@ export function AuthScreen({ theme }: { theme: ThemeColors }) {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [googleEnabled, setGoogleEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch(`${supabaseUrl}/auth/v1/settings`, { headers: { apikey: supabasePublishableKey } })
+      .then((response) => response.ok ? response.json() : Promise.reject())
+      .then((settings) => setGoogleEnabled(!!settings?.external?.google))
+      .catch(() => setGoogleEnabled(null));
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault(); setBusy(true); setMessage('');
@@ -38,7 +45,8 @@ export function AuthScreen({ theme }: { theme: ThemeColors }) {
         <button disabled={busy} className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-60" style={{ backgroundColor: theme.accent, color: theme.bg }}>{busy ? 'İşleniyor…' : mode === 'signup' ? 'Hesap Oluştur' : 'Giriş Yap'}</button>
       </form>
       <div className="flex items-center gap-3 my-4"><span className="h-px flex-1" style={{ backgroundColor: theme.border }}/><small style={{ color: theme.textMuted }}>veya</small><span className="h-px flex-1" style={{ backgroundColor: theme.border }}/></div>
-      <button onClick={() => signInWithGoogle().catch((e) => setMessage(e.message))} className="w-full py-3 rounded-xl border text-sm font-bold flex items-center justify-center gap-2" style={{ backgroundColor: theme.card, borderColor: theme.border }}><Sparkles size={17} color={theme.accent}/> Google ile Devam Et</button>
+      <button disabled={googleEnabled === false} onClick={() => signInWithGoogle().catch((e) => setMessage(e.message))} className="w-full py-3 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: theme.card, borderColor: theme.border }}><Sparkles size={17} color={theme.accent}/> {googleEnabled === false ? 'Google Girişi Yapılandırılmamış' : 'Google ile Devam Et'}</button>
+      {googleEnabled === false && <p className="mt-2 text-[11px] text-center" style={{ color: theme.textMuted }}>Gmail adresinizle üstteki Kayıt Ol seçeneği çalışır.</p>}
     </section>
   </main>;
 }

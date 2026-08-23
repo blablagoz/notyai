@@ -216,8 +216,18 @@ public class NativeDevicePlugin extends Plugin {
     @PluginMethod
     public void deleteCalendarEvent(PluginCall call) {
         if (!ensureCalendarPermission(call)) return;
-        Long eventId = call.getLong("eventId");
-        if (eventId == null) {
+        Object rawEventId = call.getData().opt("eventId");
+        Long eventId = null;
+        if (rawEventId instanceof Number) {
+            eventId = ((Number) rawEventId).longValue();
+        } else if (rawEventId instanceof String) {
+            try {
+                eventId = Long.parseLong(((String) rawEventId).trim());
+            } catch (NumberFormatException ignored) {
+                // Rejected below with the same user-facing validation message.
+            }
+        }
+        if (eventId == null || eventId <= 0) {
             call.reject("eventId zorunludur.");
             return;
         }

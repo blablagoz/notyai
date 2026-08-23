@@ -33,7 +33,10 @@ export async function removeEventFromDevice(event: CalendarEvent): Promise<Devic
       if (!permission.granted) {
         throw new Error('Takvim erişimi verilmedi. Görevi cihaz takviminden kaldırmak için izni onaylayın.');
       }
-      await NativeDevice.deleteCalendarEvent({ eventId: Number(event.nativeCalendarEventId) });
+      // CalendarContract IDs are stored as text in Supabase. Keep the value as
+      // text across the Capacitor bridge so large IDs are not rounded or
+      // serialized as null before Android receives them.
+      await NativeDevice.deleteCalendarEvent({ eventId: event.nativeCalendarEventId });
       result.calendarCleared = true;
     } catch (error: any) {
       result.errors.push(`Takvim kaydı temizlenemedi: ${error?.message || 'bilinmeyen hata'}`);

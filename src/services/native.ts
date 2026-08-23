@@ -33,7 +33,7 @@ export interface NativeDevicePlugin {
     calendarId?: number;
     reminderMinutes?: number;
   }): Promise<{ eventId: number; calendarId: number }>;
-  deleteCalendarEvent(options: { eventId: number }): Promise<{ deleted: boolean }>;
+  deleteCalendarEvent(options: { eventId: string | number }): Promise<{ deleted: boolean }>;
   startSpeechRecognition(options?: {
     language?: string;
     prompt?: string;

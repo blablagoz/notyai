@@ -39,7 +39,7 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [title, setTitle] = useState(initialEvent?.title || '');
   const [startTime, setStartTime] = useState(formatInputDateTime(defaultStart));
   const [endTime, setEndTime] = useState(formatInputDateTime(defaultEnd));
-  const [category, setCategory] = useState(initialEvent?.category || 'Genel');
+  const [category, setCategory] = useState(initialEvent?.category || '');
   const [location, setLocation] = useState(initialEvent?.location || '');
   const [description, setDescription] = useState(initialEvent?.description || '');
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(
@@ -48,7 +48,10 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const categories = ['Hukuk', 'Resmi', 'Toplantı', 'Spor', 'Sağlık', 'Ders', 'Kişisel', 'Ekip'];
+  const [categoryHistory] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('notyai_category_history') || '[]'); }
+    catch { return []; }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,9 +60,11 @@ export const EventModal: React.FC<EventModalProps> = ({
     setIsSaving(true); setError('');
     try {
       await onSave({ title: title.trim(), startTime: new Date(startTime).toISOString(), endTime: new Date(endTime).toISOString(),
-        category, location: location.trim() || undefined, description: description.trim() || undefined,
+        category: category.trim(), location: location.trim() || undefined, description: description.trim() || undefined,
         reminderMinutesBefore: Number(reminderMinutesBefore), isCompleted: initialEvent?.isCompleted || false,
         teamId: initialEvent?.teamId, teamName: initialEvent?.teamName });
+      const nextHistory = [category.trim(), ...categoryHistory.filter((item) => item.toLocaleLowerCase('tr-TR') !== category.trim().toLocaleLowerCase('tr-TR'))].filter(Boolean).slice(0, 12);
+      localStorage.setItem('notyai_category_history', JSON.stringify(nextHistory));
       onClose();
     } catch (err: any) { setError(err.message || 'Etkinlik kaydedilemedi.'); }
     finally { setIsSaving(false); }
@@ -111,7 +116,7 @@ export const EventModal: React.FC<EventModalProps> = ({
               type="text"
               required
               autoFocus
-              placeholder="Örn: Kadıköy Noterliği İmzası..."
+              placeholder="Örn: İş Toplantısı, Spor"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full p-3 rounded-xl border text-sm font-medium outline-none"
@@ -169,24 +174,8 @@ export const EventModal: React.FC<EventModalProps> = ({
             <label className="block text-xs font-bold mb-1.5" style={{ color: theme.textMuted }}>
               KATEGORİ
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              {categories.map((cat) => (
-                <button
-                  type="button"
-                  key={cat}
-                  id={`cat-select-${cat}`}
-                  onClick={() => setCategory(cat)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all"
-                  style={{
-                    backgroundColor: category === cat ? theme.accent : theme.card,
-                    color: category === cat ? theme.bg : theme.textMuted,
-                    border: `1px solid ${category === cat ? theme.accent : theme.border}`,
-                  }}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
+            <input id="event-category-input" type="text" required list="notyai-category-suggestions" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Kategorinizi yazın" className="w-full p-3 rounded-xl border text-sm font-medium outline-none" style={{ backgroundColor: theme.card, borderColor: theme.border, color: theme.textPrimary }}/>
+            <datalist id="notyai-category-suggestions">{categoryHistory.map((item) => <option key={item} value={item}/>)}</datalist>
           </div>
 
           {/* Location */}
@@ -198,7 +187,7 @@ export const EventModal: React.FC<EventModalProps> = ({
               <input
                 id="event-location-input"
                 type="text"
-                placeholder="Örn: Kadıköy Adliyesi, Zoom, Ofis..."
+                placeholder="Örn: Ofis, Zoom, Ev, Market"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 className="w-full p-3 pl-10 rounded-xl border text-sm font-medium outline-none"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, CheckCircle2, Circle, Clock, MapPin, Bell, Trash2, CalendarClock } from 'lucide-react';
+import { Check, CheckCircle2, Circle, Clock, MapPin, Bell, Trash2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CalendarEvent } from '../types';
 import { ThemeColors } from '../theme';
@@ -10,7 +10,6 @@ interface TimelineEventItemProps {
   theme: ThemeColors;
   onToggleComplete: (id: string) => void;
   onDeleteEvent: (id: string) => void;
-  onRescheduleEvent: (id: string, hours: number) => void;
 }
 
 export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
@@ -19,7 +18,6 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
   theme,
   onToggleComplete,
   onDeleteEvent,
-  onRescheduleEvent,
 }) => {
   const isCompleted = !!event.isCompleted;
 
@@ -154,22 +152,6 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
 
           {/* Quick Actions */}
           <div className="flex items-center gap-1.5 ml-auto">
-            {/* Reschedule 1 hr button */}
-            <button
-              id={`reschedule-btn-${event.id}`}
-              onClick={() => onRescheduleEvent(event.id, 1)}
-              title="1 Saat Ötele"
-              className="p-1.5 rounded-lg text-xs font-medium transition-colors hover:opacity-90 flex items-center gap-1"
-              style={{
-                backgroundColor: theme.panel,
-                color: theme.textSubtle,
-                border: `1px solid ${theme.border}`,
-              }}
-            >
-              <CalendarClock size={13} />
-              <span className="hidden sm:inline text-[11px]">+1 Saat</span>
-            </button>
-
             {/* Toggle Completion Button */}
             <button
               id={`toggle-complete-btn-${event.id}`}

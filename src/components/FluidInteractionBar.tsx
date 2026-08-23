@@ -135,7 +135,6 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
     'Yarın 15:00 Kadıköy Noterliği',
     'Cuma 10:00 Yönetim Toplantısı',
     'Bugün 18:30 Spor Salonu',
-    'İşlerimi 1 saat ötele',
   ];
 
   return (

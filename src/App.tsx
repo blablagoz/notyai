@@ -128,6 +128,15 @@ export function App() {
     setDailyBriefing(count ? `Bugün ${count} etkinliğiniz var. Takvim ve bildirimleriniz cihazınızla eşitlendi.` : 'Bugün için planlanmış etkinliğiniz yok.');
   }, [selectedDate, events]);
 
+  useEffect(() => {
+    if (!assistantSummary) return;
+    const timer = window.setTimeout(() => {
+      setAssistantSummary(undefined);
+      setLiveTranscript('');
+    }, 4500);
+    return () => window.clearTimeout(timer);
+  }, [assistantSummary]);
+
   const isSameDay = (d1: Date, d2: Date) => {
     return (
       d1.getFullYear() === d2.getFullYear() &&
@@ -463,6 +472,7 @@ export function App() {
         isProcessingAI={isProcessingAI}
         transcript={liveTranscript}
         assistantSummary={assistantSummary}
+        onDismiss={() => { setAssistantSummary(undefined); setLiveTranscript(''); }}
         theme={currentTheme}
       />
 
@@ -478,7 +488,6 @@ export function App() {
           isProcessingAI={isProcessingAI}
           onToggleComplete={handleToggleComplete}
           onDeleteEvent={handleDeleteEvent}
-          onRescheduleEvent={handleRescheduleEvent}
           onSendCommand={handleSendCommand}
           onOpenTeamWorkspace={() => setIsTeamWorkspaceOpen(true)}
           onOpenAddEventModal={() => {
@@ -555,7 +564,6 @@ export function App() {
                     theme={currentTheme}
                     onToggleComplete={handleToggleComplete}
                     onDeleteEvent={handleDeleteEvent}
-                    onRescheduleEvent={handleRescheduleEvent}
                   />
                 ))}
               </div>

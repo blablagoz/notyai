@@ -29,7 +29,6 @@ interface TabletSplitLayoutProps {
   isProcessingAI: boolean;
   onToggleComplete: (id: string) => void;
   onDeleteEvent: (id: string) => void;
-  onRescheduleEvent: (id: string, hours: number) => void;
   onSendCommand: (text: string) => Promise<void>;
   onOpenTeamWorkspace: () => void;
   onOpenAddEventModal: () => void;
@@ -45,7 +44,6 @@ export const TabletSplitLayout: React.FC<TabletSplitLayoutProps> = ({
   isProcessingAI,
   onToggleComplete,
   onDeleteEvent,
-  onRescheduleEvent,
   onSendCommand,
   onOpenTeamWorkspace,
   onOpenAddEventModal,
@@ -357,7 +355,6 @@ export const TabletSplitLayout: React.FC<TabletSplitLayoutProps> = ({
                   theme={theme}
                   onToggleComplete={onToggleComplete}
                   onDeleteEvent={onDeleteEvent}
-                  onRescheduleEvent={onRescheduleEvent}
                 />
               ))}
             </div>

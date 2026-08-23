@@ -8,7 +8,7 @@ interface TeamWorkspaceScreenProps {
   teams: TeamModel[];
   friends: FriendShare[];
   pendingInvitations: TeamInvitation[];
-  onCreateTeam: (name: string, description: string) => void;
+  onCreateTeam: (name: string, description: string) => Promise<void>;
   onAddTeamReminder: (teamId: string, reminder: Omit<TeamReminder, 'id' | 'teamId' | 'createdBy' | 'createdByName'>) => void;
   onSearchUserByPublicId: (id: string) => Promise<PublicProfile | null>;
   onInviteMember: (teamId: string, publicId: string) => Promise<void>;
@@ -32,6 +32,8 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamDesc, setNewTeamDesc] = useState('');
+  const [createTeamBusy, setCreateTeamBusy] = useState(false);
+  const [createTeamError, setCreateTeamError] = useState('');
 
   // Selected Team for broadcast task modal
   const [selectedTeamForTask, setSelectedTeamForTask] = useState<TeamModel | null>(null);
@@ -63,13 +65,21 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
     finally { setInviteBusy(false); }
   };
 
-  const handleCreateTeamSubmit = (e: React.FormEvent) => {
+  const handleCreateTeamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newTeamName.trim()) {
-      onCreateTeam(newTeamName.trim(), newTeamDesc.trim());
-      setNewTeamName('');
-      setNewTeamDesc('');
-      setShowCreateTeamModal(false);
+      setCreateTeamBusy(true);
+      setCreateTeamError('');
+      try {
+        await onCreateTeam(newTeamName.trim(), newTeamDesc.trim());
+        setNewTeamName('');
+        setNewTeamDesc('');
+        setShowCreateTeamModal(false);
+      } catch (error: any) {
+        setCreateTeamError(error?.message || 'Ekip kurulamadı. Lütfen yeniden deneyin.');
+      } finally {
+        setCreateTeamBusy(false);
+      }
     }
   };
 
@@ -495,11 +505,13 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
                 />
               </div>
 
+              {createTeamError && <p className="text-xs" role="alert" style={{ color: theme.warning }}>{createTeamError}</p>}
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
                   id="cancel-create-team-btn"
-                  onClick={() => setShowCreateTeamModal(false)}
+                  onClick={() => { setCreateTeamError(''); setShowCreateTeamModal(false); }}
+                  disabled={createTeamBusy}
                   className="px-4 py-2 rounded-xl text-xs font-bold"
                   style={{ color: theme.textMuted }}
                 >
@@ -508,10 +520,11 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
                 <button
                   type="submit"
                   id="submit-create-team-btn"
-                  className="px-5 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                  disabled={createTeamBusy}
+                  className="px-5 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
                   style={{ backgroundColor: theme.accent, color: theme.bg }}
                 >
-                  Ekibi Kur
+                  {createTeamBusy ? 'Kuruluyor…' : 'Ekibi Kur'}
                 </button>
               </div>
             </form>

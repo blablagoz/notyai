@@ -27,6 +27,8 @@ import { TeamWorkspaceScreen } from './components/TeamWorkspaceScreen';
 import { SettingsModal } from './components/SettingsModal';
 import { EventModal } from './components/EventModal';
 import { NotificationDrawer } from './components/NotificationDrawer';
+import { TimeFormatPrompt } from './components/TimeFormatPrompt';
+import { readTimeFormatPreference, saveTimeFormatPreference, TimeFormatPreference } from './utils/timeFormat';
 
 export function App() {
   // Theme state
@@ -36,6 +38,7 @@ export function App() {
   });
 
   const currentTheme: ThemeColors = themes[themeMode];
+  const [timeFormat, setTimeFormat] = useState<TimeFormatPreference | null>(() => readTimeFormatPreference());
 
   const [authLoading, setAuthLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -52,7 +55,7 @@ export function App() {
 
   // Layout mode: dual-pane split vs single mobile flow
   const [isSplitLayout, setIsSplitLayout] = useState<boolean>(() => {
-    return window.innerWidth >= 1024;
+    return window.innerWidth >= 768;
   });
 
   // AI & Voice interaction states
@@ -78,14 +81,19 @@ export function App() {
   }, [themeMode]);
 
   const refreshData = useCallback(async (activeUserId: string) => {
-    try {
-      setDataError('');
-      const [nextProfile, nextEvents, nextTeams, nextInvites, nextNotifications] = await Promise.all([
-        loadProfile(activeUserId), loadEvents(), loadTeams(), loadInvitations(), loadNotifications(),
-      ]);
-      setProfile(nextProfile); setEvents(nextEvents); setTeams(nextTeams);
-      setPendingInvitations(nextInvites); setNotifications(nextNotifications);
-    } catch (error: any) { setDataError(error.message || 'Veriler eşitlenemedi.'); }
+    setDataError('');
+    const [profileResult, eventsResult, teamsResult, invitesResult, notificationsResult] = await Promise.allSettled([
+      loadProfile(activeUserId), loadEvents(), loadTeams(), loadInvitations(activeUserId), loadNotifications(),
+    ]);
+    if (profileResult.status === 'fulfilled') setProfile(profileResult.value);
+    if (eventsResult.status === 'fulfilled') setEvents(eventsResult.value);
+    if (teamsResult.status === 'fulfilled') setTeams(teamsResult.value);
+    if (invitesResult.status === 'fulfilled') setPendingInvitations(invitesResult.value);
+    if (notificationsResult.status === 'fulfilled') setNotifications(notificationsResult.value);
+    const errors = [profileResult, eventsResult, teamsResult, invitesResult, notificationsResult]
+      .filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+      .map((result) => result.reason?.message || 'Veri eşitleme hatası');
+    if (errors.length) setDataError(errors.join(' · '));
   }, []);
 
   useEffect(() => {
@@ -114,9 +122,7 @@ export function App() {
   // Sync window resize for layout
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setIsSplitLayout(false);
-      }
+      setIsSplitLayout(window.innerWidth >= 768);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -148,15 +154,49 @@ export function App() {
   // Toggle event completion
   const handleToggleComplete = async (id: string) => {
     const current = events.find((e) => e.id === id); if (!current) return;
-    await updateEvent(id, { is_completed: !current.isCompleted });
-    setEvents((prev) => prev.map((e) => e.id === id ? { ...e, isCompleted: !e.isCompleted } : e));
+    const completed = !current.isCompleted;
+    setDataError('');
+    try {
+      await updateEvent(id, { is_completed: completed });
+      if (completed) {
+        const cleanup = await removeEventFromDevice(current);
+        const devicePatch: Record<string, unknown> = {};
+        if (cleanup.notificationsCleared) devicePatch.local_notification_id = null;
+        if (cleanup.calendarCleared) devicePatch.native_calendar_event_id = null;
+        if (Object.keys(devicePatch).length) await updateEvent(id, devicePatch);
+        setEvents((prev) => prev.map((event) => event.id === id ? {
+          ...event,
+          isCompleted: true,
+          localNotificationId: cleanup.notificationsCleared ? undefined : event.localNotificationId,
+          nativeCalendarEventId: cleanup.calendarCleared ? undefined : event.nativeCalendarEventId,
+        } : event));
+        if (cleanup.errors.length) setDataError(`Görev tamamlandı; cihaz senkronu yeniden denenecek. ${cleanup.errors.join(' ')}`);
+      } else {
+        const native = await syncEventToDevice({ ...current, isCompleted: false });
+        await updateEvent(id, {
+          native_calendar_event_id: native.nativeCalendarEventId || null,
+          local_notification_id: native.localNotificationId ?? null,
+        });
+        setEvents((prev) => prev.map((event) => event.id === id ? { ...event, ...native, isCompleted: false } : event));
+      }
+    } catch (error: any) {
+      setDataError(error?.message || 'Görev ve cihaz takvimi eşitlenemedi.');
+      if (userId) await refreshData(userId);
+    }
   };
 
   // Delete event
   const handleDeleteEvent = async (id: string) => {
     const current = events.find((e) => e.id === id); if (!current) return;
-    await removeEventFromDevice(current); await removeEvent(id);
-    setEvents((prev) => prev.filter((e) => e.id !== id));
+    setDataError('');
+    try {
+      const cleanup = await removeEventFromDevice(current);
+      if (cleanup.errors.length) throw new Error(cleanup.errors.join(' '));
+      await removeEvent(id);
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+    } catch (error: any) {
+      setDataError(`Görev silinemedi; takvim kaydı korunarak yeniden deneyebilirsiniz. ${error?.message || ''}`);
+    }
   };
 
   // Reschedule event by hours
@@ -418,7 +458,7 @@ export function App() {
             id="toggle-layout-btn"
             onClick={() => setIsSplitLayout(!isSplitLayout)}
             title={isSplitLayout ? 'Mobil Tek Akış Görünümü' : 'Geniş Panel / Tablet Görünümü'}
-            className="hidden lg:block p-2.5 rounded-2xl transition-all hover:scale-105"
+            className="hidden md:block p-2.5 rounded-2xl transition-all hover:scale-105"
             style={{
               backgroundColor: currentTheme.card,
               color: isSplitLayout ? currentTheme.accent : currentTheme.textMuted,
@@ -486,6 +526,7 @@ export function App() {
           teams={teams}
           dailyBriefing={dailyBriefing}
           isProcessingAI={isProcessingAI}
+          timeFormat={timeFormat || '24h'}
           onToggleComplete={handleToggleComplete}
           onDeleteEvent={handleDeleteEvent}
           onSendCommand={handleSendCommand}
@@ -564,6 +605,7 @@ export function App() {
                     theme={currentTheme}
                     onToggleComplete={handleToggleComplete}
                     onDeleteEvent={handleDeleteEvent}
+                    timeFormat={timeFormat || '24h'}
                   />
                 ))}
               </div>
@@ -591,6 +633,25 @@ export function App() {
           theme={currentTheme}
           events={events}
           onClose={() => setIsSettingsOpen(false)}
+          timeFormat={timeFormat || '24h'}
+          onTimeFormatChange={(preference) => {
+            saveTimeFormatPreference(preference);
+            setTimeFormat(preference);
+          }}
+          onSignOut={async () => {
+            setIsSettingsOpen(false);
+            await supabase.auth.signOut();
+          }}
+        />
+      )}
+
+      {userId && !timeFormat && (
+        <TimeFormatPrompt
+          theme={currentTheme}
+          onSelect={(preference) => {
+            saveTimeFormatPreference(preference);
+            setTimeFormat(preference);
+          }}
         />
       )}
 

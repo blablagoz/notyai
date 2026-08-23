@@ -3,6 +3,7 @@ import { Check, CheckCircle2, Circle, Clock, MapPin, Bell, Trash2 } from 'lucide
 import confetti from 'canvas-confetti';
 import { CalendarEvent } from '../types';
 import { ThemeColors } from '../theme';
+import { formatEventDateLabel, formatEventTime, TimeFormatPreference } from '../utils/timeFormat';
 
 interface TimelineEventItemProps {
   event: CalendarEvent;
@@ -10,6 +11,7 @@ interface TimelineEventItemProps {
   theme: ThemeColors;
   onToggleComplete: (id: string) => void;
   onDeleteEvent: (id: string) => void;
+  timeFormat?: TimeFormatPreference;
 }
 
 export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
@@ -18,20 +20,13 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
   theme,
   onToggleComplete,
   onDeleteEvent,
-}) => {
+  timeFormat = '24h',
+}: TimelineEventItemProps) => {
   const isCompleted = !!event.isCompleted;
 
-  const formatTime = (iso: string) => {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', hour12: false });
-    } catch {
-      return '--:--';
-    }
-  };
-
-  const startTimeStr = formatTime(event.startTime);
-  const endTimeStr = formatTime(event.endTime);
+  const startTimeStr = formatEventTime(event.startTime, timeFormat);
+  const endTimeStr = formatEventTime(event.endTime, timeFormat);
+  const eventDateLabel = formatEventDateLabel(event.startTime);
 
   const getCategoryBadgeStyle = (category: string) => {
     switch (category.toLowerCase()) {
@@ -111,6 +106,16 @@ export const TimelineEventItem: React.FC<TimelineEventItemProps> = ({
         <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
           {/* Time & Category Badges */}
           <div className="flex items-center gap-2 flex-wrap">
+            <span
+              className="px-2.5 py-1 rounded-lg text-xs font-bold"
+              style={{
+                backgroundColor: theme.panel,
+                color: theme.textPrimary,
+                border: `1px solid ${theme.border}`,
+              }}
+            >
+              {eventDateLabel}
+            </span>
             <div
               className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold font-mono tracking-tight"
               style={{

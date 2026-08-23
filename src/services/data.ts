@@ -7,8 +7,21 @@ const unwrap = <T>(result: { data: T | null; error: { message: string } | null }
 };
 
 export async function loadProfile(userId: string): Promise<UserProfile> {
-  const row: any = unwrap(await supabase.from('profiles').select('id,email,full_name,avatar_url,public_id').eq('id', userId).single());
-  return { id: row.id, email: row.email, fullName: row.full_name || undefined, avatarUrl: row.avatar_url || undefined, publicId: row.public_id };
+  // Profile email is deliberately private. Querying it here caused a 403 and
+  // prevented otherwise valid events and teams from reaching the screen.
+  const [profileResult, userResult] = await Promise.all([
+    supabase.from('profiles').select('id,full_name,avatar_url,public_id').eq('id', userId).single(),
+    supabase.auth.getUser(),
+  ]);
+  const row: any = unwrap(profileResult);
+  if (userResult.error) throw new Error(userResult.error.message);
+  return {
+    id: row.id,
+    email: userResult.data.user?.email || '',
+    fullName: row.full_name || undefined,
+    avatarUrl: row.avatar_url || undefined,
+    publicId: row.public_id,
+  };
 }
 
 const mapEvent = (row: any): CalendarEvent => ({
@@ -89,8 +102,8 @@ export async function inviteMember(teamId: string, publicId: string) {
   if (result.error) throw new Error(result.error.message);
 }
 
-export async function loadInvitations(): Promise<TeamInvitation[]> {
-  const rows: any[] = unwrap(await supabase.from('team_invitations').select('id,team_id,status,created_at,teams(name),profiles!team_invitations_inviter_id_fkey(full_name)').eq('status', 'pending').order('created_at', { ascending: false }));
+export async function loadInvitations(userId: string): Promise<TeamInvitation[]> {
+  const rows: any[] = unwrap(await supabase.from('team_invitations').select('id,team_id,status,created_at,teams(name),profiles!team_invitations_inviter_id_fkey(full_name)').eq('invitee_id', userId).eq('status', 'pending').order('created_at', { ascending: false }));
   return rows.map((r) => ({ id: r.id, teamId: r.team_id, teamName: r.teams?.name || 'Ekip', inviterName: r.profiles?.full_name || 'NotyAI kullanıcısı', createdAt: r.created_at, status: r.status }));
 }
 

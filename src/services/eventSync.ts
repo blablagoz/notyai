@@ -7,18 +7,43 @@ function notificationIdFor(eventId: string) {
   return (Math.abs(hash) % 1_000_000_000) * 2 + 10;
 }
 
-export async function removeEventFromDevice(event: CalendarEvent) {
-  if (event.localNotificationId) await cancelEventNotification(event.localNotificationId).catch(() => undefined);
-  if (isNativeAndroid() && event.nativeCalendarEventId) {
-    await NativeDevice.deleteCalendarEvent({ eventId: Number(event.nativeCalendarEventId) }).catch(() => undefined);
+export interface DeviceCleanupResult {
+  notificationsCleared: boolean;
+  calendarCleared: boolean;
+  errors: string[];
+}
+
+export async function removeEventFromDevice(event: CalendarEvent): Promise<DeviceCleanupResult> {
+  const result: DeviceCleanupResult = {
+    notificationsCleared: !event.localNotificationId,
+    calendarCleared: !event.nativeCalendarEventId || !isNativeAndroid(),
+    errors: [],
+  };
+  if (event.localNotificationId) {
+    try {
+      await cancelEventNotification(event.localNotificationId);
+      result.notificationsCleared = true;
+    } catch (error: any) {
+      result.errors.push(`Bildirim temizlenemedi: ${error?.message || 'bilinmeyen hata'}`);
+    }
   }
+  if (isNativeAndroid() && event.nativeCalendarEventId) {
+    try {
+      await NativeDevice.deleteCalendarEvent({ eventId: Number(event.nativeCalendarEventId) });
+      result.calendarCleared = true;
+    } catch (error: any) {
+      result.errors.push(`Takvim kaydı temizlenemedi: ${error?.message || 'bilinmeyen hata'}`);
+    }
+  }
+  return result;
 }
 
 export async function syncEventToDevice(event: CalendarEvent): Promise<Pick<CalendarEvent, 'nativeCalendarEventId' | 'localNotificationId'>> {
-  await removeEventFromDevice(event);
+  const cleanup = await removeEventFromDevice(event);
+  if (cleanup.errors.length) throw new Error(cleanup.errors.join(' '));
   const result: Pick<CalendarEvent, 'nativeCalendarEventId' | 'localNotificationId'> = {};
   const notificationId = notificationIdFor(event.id);
-  if (new Date(event.startTime).getTime() > Date.now() + event.reminderMinutesBefore * 60_000) {
+  if (new Date(event.startTime).getTime() > Date.now()) {
     await scheduleEventNotification({ notificationId, eventId: event.id, title: event.title,
       eventAt: new Date(event.startTime).getTime(), reminderMinutes: event.reminderMinutesBefore,
       body: event.location ? `${event.location} • ${event.reminderMinutesBefore} dakika kaldı.` : undefined });

@@ -1,7 +1,8 @@
 import React from 'react';
-import { X, CheckCircle2, Download, Sparkles, Moon, Sun, Bell, Volume2, ShieldCheck } from 'lucide-react';
+import { X, CheckCircle2, Download, Sparkles, Moon, Sun, Bell, ShieldCheck, Clock3, LogOut } from 'lucide-react';
 import { AppThemeMode, CalendarEvent } from '../types';
 import { ThemeColors } from '../theme';
+import { TimeFormatPreference } from '../utils/timeFormat';
 
 interface SettingsModalProps {
   currentTheme: AppThemeMode;
@@ -9,6 +10,9 @@ interface SettingsModalProps {
   theme: ThemeColors;
   events: CalendarEvent[];
   onClose: () => void;
+  timeFormat?: TimeFormatPreference;
+  onTimeFormatChange?: (preference: TimeFormatPreference) => void;
+  onSignOut?: () => void | Promise<void>;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -17,6 +21,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   theme,
   events,
   onClose,
+  timeFormat = '24h',
+  onTimeFormatChange,
+  onSignOut,
 }) => {
   const exportICS = () => {
     // Generate standard .ics (iCalendar) format
@@ -93,6 +100,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <X size={18} />
           </button>
+        </div>
+
+        {/* Saat gösterimi */}
+        <div className="mt-6">
+          <label className="text-[11px] font-bold tracking-widest uppercase block mb-3" style={{ color: theme.textSubtle }}>
+            SAAT GÖSTERİMİ
+          </label>
+          <div className="grid grid-cols-2 gap-2.5">
+            {(['24h', '12h'] as const).map((preference) => {
+              const selected = timeFormat === preference;
+              return (
+                <button
+                  key={preference}
+                  type="button"
+                  onClick={() => onTimeFormatChange?.(preference)}
+                  className="p-3.5 rounded-2xl border flex items-center gap-3 text-left transition-all"
+                  style={{
+                    backgroundColor: selected ? `${theme.accent}15` : theme.card,
+                    borderColor: selected ? theme.accent : theme.border,
+                    color: selected ? theme.accent : theme.textPrimary,
+                  }}
+                >
+                  <Clock3 size={17} />
+                  <span>
+                    <strong className="block text-xs">{preference === '24h' ? '24 saat' : '12 saat'}</strong>
+                    <span className="text-[11px]">{preference === '24h' ? '15:00' : '03:00 ÖS'}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* 1. Theme Selection */}
@@ -239,6 +277,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </button>
           </div>
         </div>
+
+        {onSignOut && (
+          <div className="mt-6 pt-5 border-t" style={{ borderColor: theme.border }}>
+            <button
+              id="settings-sign-out-btn"
+              type="button"
+              onClick={() => void onSignOut()}
+              className="w-full p-3.5 rounded-2xl border flex items-center justify-center gap-2 text-sm font-bold transition-all hover:opacity-90"
+              style={{ backgroundColor: '#EF444415', borderColor: '#EF444450', color: '#F87171' }}
+            >
+              <LogOut size={17} />
+              Oturumu Kapat
+            </button>
+          </div>
+        )}
 
         {/* 4. AI Engine Status */}
         <div className="mt-6 pt-4 border-t flex items-center justify-between" style={{ borderColor: theme.border }}>

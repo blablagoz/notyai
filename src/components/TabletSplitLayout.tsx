@@ -18,6 +18,7 @@ import { CalendarEvent, TeamModel } from '../types';
 import { ThemeColors } from '../theme';
 import { TimelineEventItem } from './TimelineEventItem';
 import { FluidInteractionBar } from './FluidInteractionBar';
+import { TimeFormatPreference } from '../utils/timeFormat';
 
 interface TabletSplitLayoutProps {
   selectedDate: Date;
@@ -32,6 +33,7 @@ interface TabletSplitLayoutProps {
   onSendCommand: (text: string) => Promise<void>;
   onOpenTeamWorkspace: () => void;
   onOpenAddEventModal: () => void;
+  timeFormat?: TimeFormatPreference;
 }
 
 export const TabletSplitLayout: React.FC<TabletSplitLayoutProps> = ({
@@ -47,6 +49,7 @@ export const TabletSplitLayout: React.FC<TabletSplitLayoutProps> = ({
   onSendCommand,
   onOpenTeamWorkspace,
   onOpenAddEventModal,
+  timeFormat = '24h',
 }) => {
   const [isPlayingBriefing, setIsPlayingBriefing] = useState(false);
 
@@ -355,6 +358,7 @@ export const TabletSplitLayout: React.FC<TabletSplitLayoutProps> = ({
                   theme={theme}
                   onToggleComplete={onToggleComplete}
                   onDeleteEvent={onDeleteEvent}
+                  timeFormat={timeFormat}
                 />
               ))}
             </div>

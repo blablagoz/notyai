@@ -86,11 +86,26 @@ export async function scheduleEventNotification(options: {
   body?: string;
 }) {
   const notificationAt = options.eventAt - options.reminderMinutes * 60_000;
-  if (notificationAt <= Date.now()) {
+  if (options.eventAt <= Date.now()) {
     throw new Error('Hatırlatma zamanı geçmişte olamaz.');
   }
   const permissions = await prepareEventNotifications(false);
   if (!permissions.granted) throw new Error('Bildirim izni verilmedi.');
+
+  // The reminder may already have passed while the event itself is still in
+  // the future. In that case keep the event-time alert instead of dropping both.
+  if (notificationAt <= Date.now()) {
+    return LocalNotifications.schedule({
+      notifications: [{
+        id: options.notificationId + 1,
+        title: options.title,
+        body: 'Etkinlik zamanı geldi.',
+        channelId: isNativeAndroid() ? EVENT_REMINDER_CHANNEL : undefined,
+        schedule: { at: new Date(options.eventAt), allowWhileIdle: true },
+        extra: { eventId: options.eventId, atEventTime: true },
+      }],
+    });
+  }
 
   return LocalNotifications.schedule({
     notifications: [

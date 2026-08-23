@@ -138,40 +138,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <label className="text-[11px] font-bold tracking-widest uppercase block mb-3" style={{ color: theme.textSubtle }}>
             TEMA SEÇİMİ
           </label>
-          <div className="grid grid-cols-3 gap-2.5">
-            {/* Obsidian */}
-            <button
-              id="theme-btn-obsidian"
-              onClick={() => onThemeChange('obsidian')}
-              className="p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer group border"
-              style={{
-                backgroundColor: '#0D1014',
-                borderColor: currentTheme === 'obsidian' ? '#00F2DE' : '#2C3644',
-                boxShadow: currentTheme === 'obsidian' ? '0 0 16px rgba(0, 242, 222, 0.35)' : 'none',
-              }}
-            >
-              <div className="w-4 h-4 rounded-full mb-2 bg-[#00F2DE]" />
-              <span className="text-xs font-bold text-slate-100">Obsidyen</span>
-              <span className="text-[10px] text-slate-400">Titanyum</span>
-            </button>
-
-            {/* Petrol */}
-            <button
-              id="theme-btn-petrol"
-              onClick={() => onThemeChange('petrol')}
-              className="p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer group border"
-              style={{
-                backgroundColor: '#091212',
-                borderColor: currentTheme === 'petrol' ? '#10F0D2' : '#24403D',
-                boxShadow: currentTheme === 'petrol' ? '0 0 16px rgba(16, 240, 210, 0.35)' : 'none',
-              }}
-            >
-              <div className="w-4 h-4 rounded-full mb-2 bg-[#10F0D2]" />
-              <span className="text-xs font-bold text-teal-100">Gece</span>
-              <span className="text-[10px] text-teal-400">Petrolü</span>
-            </button>
-
-            {/* Light */}
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               id="theme-btn-light"
               onClick={() => onThemeChange('light')}
@@ -184,7 +151,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             >
               <div className="w-4 h-4 rounded-full mb-2 bg-[#0284C7]" />
               <span className="text-xs font-bold text-slate-900">Aydınlık</span>
-              <span className="text-[10px] text-slate-600">Arı Beyaz</span>
+              <span className="text-[10px] text-slate-600">Mavi – Beyaz</span>
+            </button>
+
+            <button
+              id="theme-btn-dark"
+              onClick={() => onThemeChange('dark')}
+              className="p-3 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer group border"
+              style={{
+                backgroundColor: '#0D1014',
+                borderColor: currentTheme === 'dark' ? '#00F2DE' : '#2C3644',
+                boxShadow: currentTheme === 'dark' ? '0 0 16px rgba(0, 242, 222, 0.35)' : 'none',
+              }}
+            >
+              <div className="w-4 h-4 rounded-full mb-2 bg-[#00F2DE]" />
+              <span className="text-xs font-bold text-slate-100">Gece</span>
+              <span className="text-[10px] text-slate-400">Koyu Görünüm</span>
             </button>
           </div>
         </div>

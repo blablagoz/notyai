@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Plus, Shield, ShieldAlert, Calendar, UserPlus, Eye, BellPlus, CheckCircle, Clock } from 'lucide-react';
+import { Users, Plus, Shield, ShieldAlert, Calendar, UserPlus, Eye, BellPlus, CheckCircle, Clock, Trash2, UserMinus } from 'lucide-react';
 import { ThemeColors } from '../theme';
 import { TeamModel, TeamReminder, FriendShare, PublicProfile, TeamInvitation } from '../types';
 
@@ -13,6 +13,8 @@ interface TeamWorkspaceScreenProps {
   onSearchUserByPublicId: (id: string) => Promise<PublicProfile | null>;
   onInviteMember: (teamId: string, publicId: string) => Promise<void>;
   onRespondInvitation: (invitationId: string, accept: boolean) => Promise<void>;
+  onDeleteTeam?: (teamId: string) => Promise<void>;
+  onRemoveTeamMember?: (teamId: string, userId: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -26,6 +28,8 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
   onSearchUserByPublicId,
   onInviteMember,
   onRespondInvitation,
+  onDeleteTeam,
+  onRemoveTeamMember,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'teams' | 'friends'>('teams');
@@ -49,6 +53,42 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
   const [foundProfile, setFoundProfile] = useState<PublicProfile | null>(null);
   const [inviteStatus, setInviteStatus] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [selectedTeamForDelete, setSelectedTeamForDelete] = useState<TeamModel | null>(null);
+  const [selectedTeamForMembers, setSelectedTeamForMembers] = useState<TeamModel | null>(null);
+  const [teamActionBusy, setTeamActionBusy] = useState(false);
+  const [teamActionError, setTeamActionError] = useState('');
+
+  const confirmDeleteTeam = async () => {
+    if (!selectedTeamForDelete || !onDeleteTeam) return;
+    setTeamActionBusy(true);
+    setTeamActionError('');
+    try {
+      await onDeleteTeam(selectedTeamForDelete.id);
+      setSelectedTeamForDelete(null);
+    } catch (error: any) {
+      setTeamActionError(error?.message || 'Ekip silinemedi. Lütfen yeniden deneyin.');
+    } finally {
+      setTeamActionBusy(false);
+    }
+  };
+
+  const confirmRemoveMember = async (team: TeamModel, userId: string, memberName: string) => {
+    if (!onRemoveTeamMember || !window.confirm(`${memberName} ekipten çıkarılsın mı?`)) return;
+    setTeamActionBusy(true);
+    setTeamActionError('');
+    try {
+      await onRemoveTeamMember(team.id, userId);
+      setSelectedTeamForMembers((current) => current ? {
+        ...current,
+        members: current.members.filter((member) => member.id !== userId),
+        memberCount: Math.max(0, current.memberCount - 1),
+      } : null);
+    } catch (error: any) {
+      setTeamActionError(error?.message || 'Üye ekipten çıkarılamadı.');
+    } finally {
+      setTeamActionBusy(false);
+    }
+  };
 
   const searchMember = async () => {
     setInviteBusy(true); setInviteStatus(''); setFoundProfile(null);
@@ -297,6 +337,22 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
                       >
                         <BellPlus size={14} />
                         <span>Ekibe Görev Ata</span>
+                      </button><button
+                        id={`team-manage-members-${team.id}`}
+                        onClick={() => { setTeamActionError(''); setSelectedTeamForMembers(team); }}
+                        className="flex-1 min-w-[8rem] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold"
+                        style={{ backgroundColor: theme.panel, color: theme.textPrimary, border: `1px solid ${theme.border}` }}
+                      >
+                        <UserMinus size={14} />
+                        <span>Üyeleri Yönet</span>
+                      </button><button
+                        id={`team-delete-${team.id}`}
+                        onClick={() => { setTeamActionError(''); setSelectedTeamForDelete(team); }}
+                        className="flex-1 min-w-[8rem] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold"
+                        style={{ backgroundColor: `${theme.warning}15`, color: theme.warning, border: `1px solid ${theme.warning}45` }}
+                      >
+                        <Trash2 size={14} />
+                        <span>Ekibi Sil</span>
                       </button></>
                     )}
                     <button
@@ -447,6 +503,60 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
           </div>
         )}
       </div>
+
+      {selectedTeamForDelete && (
+        <div className="app-modal-layer fixed inset-0 z-60 bg-black/70 flex items-center justify-center">
+          <div className="app-modal-panel w-full max-w-md p-5 rounded-3xl border shadow-2xl" style={{ backgroundColor: theme.panel, borderColor: theme.border }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 rounded-2xl" style={{ backgroundColor: `${theme.warning}18`, color: theme.warning }}><Trash2 size={22}/></div>
+              <div>
+                <h3 className="text-lg font-bold" style={{ color: theme.textPrimary }}>Ekibi kalıcı olarak sil</h3>
+                <p className="text-xs" style={{ color: theme.textMuted }}>{selectedTeamForDelete.name}</p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed" style={{ color: theme.textSubtle }}>
+              Ekip, üyelikler, bekleyen davetler ve ekip görevleri silinecek. Bu işlem geri alınamaz.
+            </p>
+            {teamActionError && <p className="mt-3 text-xs" role="alert" style={{ color: theme.warning }}>{teamActionError}</p>}
+            <div className="flex gap-2 mt-5">
+              <button disabled={teamActionBusy} onClick={() => setSelectedTeamForDelete(null)} className="flex-1 py-2.5 rounded-xl text-xs font-bold" style={{ color: theme.textMuted, border: `1px solid ${theme.border}` }}>Vazgeç</button>
+              <button disabled={teamActionBusy || !onDeleteTeam} onClick={confirmDeleteTeam} className="flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50" style={{ backgroundColor: theme.warning, color: theme.bg }}>
+                {teamActionBusy ? 'Siliniyor…' : 'Ekibi Sil'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedTeamForMembers && (
+        <div className="app-modal-layer fixed inset-0 z-60 bg-black/70 flex items-center justify-center">
+          <div className="app-modal-panel w-full max-w-md p-5 rounded-3xl border shadow-2xl" style={{ backgroundColor: theme.panel, borderColor: theme.border }}>
+            <h3 className="text-lg font-bold" style={{ color: theme.textPrimary }}>Üyeleri Yönet</h3>
+            <p className="text-xs mb-4" style={{ color: theme.textMuted }}>{selectedTeamForMembers.name}</p>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {selectedTeamForMembers.members.map((member) => {
+                const isCreator = member.id === selectedTeamForMembers.createdBy;
+                return <div key={member.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
+                  <div className="min-w-0">
+                    <strong className="block text-sm truncate" style={{ color: theme.textPrimary }}>{member.name}</strong>
+                    <span className="text-[11px]" style={{ color: isCreator ? theme.accent : theme.textMuted }}>{isCreator ? 'Ekip kurucusu' : member.role === 'admin' ? 'Yönetici' : 'Üye'}</span>
+                  </div>
+                  <button
+                    disabled={teamActionBusy || isCreator || !onRemoveTeamMember}
+                    onClick={() => confirmRemoveMember(selectedTeamForMembers, member.id, member.name)}
+                    className="px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-40"
+                    style={{ color: theme.warning, border: `1px solid ${theme.warning}45` }}
+                  >
+                    Çıkar
+                  </button>
+                </div>;
+              })}
+            </div>
+            {teamActionError && <p className="mt-3 text-xs" role="alert" style={{ color: theme.warning }}>{teamActionError}</p>}
+            <button onClick={() => { setTeamActionError(''); setSelectedTeamForMembers(null); }} className="w-full mt-4 py-2 rounded-xl text-xs font-bold" style={{ color: theme.textMuted }}>Kapat</button>
+          </div>
+        </div>
+      )}
 
       {/* Create Team Modal */}
       {selectedTeamForInvite && <div className="app-modal-layer fixed inset-0 z-60 bg-black/70 flex items-center justify-center">

@@ -1,4 +1,4 @@
-export type AppThemeMode = 'obsidian' | 'petrol' | 'light';
+export type AppThemeMode = 'light' | 'dark';
 
 export interface CalendarEvent {
   id: string;
@@ -57,6 +57,7 @@ export interface TeamModel {
   id: string;
   name: string;
   description?: string;
+  createdBy?: string;
   role: 'admin' | 'member';
   memberCount: number;
   remindersCount: number;

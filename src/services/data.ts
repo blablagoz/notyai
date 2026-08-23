@@ -57,7 +57,7 @@ export async function removeEvent(id: string) {
 }
 
 export async function loadTeams(): Promise<TeamModel[]> {
-  const memberships: any[] = unwrap(await supabase.from('team_members').select('team_id,role,teams(id,name,description),profiles(id,full_name,public_id)').order('joined_at'));
+  const memberships: any[] = unwrap(await supabase.from('team_members').select('team_id,role,teams(id,name,description,created_by),profiles(id,full_name,public_id)').order('joined_at'));
   const teamIds = memberships.map((m) => m.team_id);
   if (!teamIds.length) return [];
   const allMembers: any[] = unwrap(await supabase.from('team_members').select('team_id,role,profiles(id,full_name,public_id)').in('team_id', teamIds));
@@ -66,20 +66,30 @@ export async function loadTeams(): Promise<TeamModel[]> {
     const team = membership.teams;
     const members = allMembers.filter((m) => m.team_id === team.id).map((m) => ({
       id: m.profiles?.id || '', name: m.profiles?.full_name || m.profiles?.public_id || 'NotyAI Kullanıcısı', role: m.role,
-      avatar: (m.profiles?.full_name || 'N').slice(0, 2).toUpperCase(),
+      avatar: (m.profiles?.full_name || 'KU').slice(0, 2).toUpperCase(),
     }));
     const teamReminders: TeamReminder[] = reminders.filter((r) => r.team_id === team.id).map((r) => ({
       id: r.id, teamId: r.team_id, title: r.title, description: r.description || undefined,
       startTime: r.start_time, endTime: r.end_time, category: r.category || 'Ekip', location: r.location || undefined,
       createdBy: r.created_by, createdByName: r.profiles?.full_name || 'Ekip yöneticisi',
     }));
-    return { id: team.id, name: team.name, description: team.description || undefined, role: membership.role,
+    return { id: team.id, name: team.name, description: team.description || undefined, createdBy: team.created_by, role: membership.role,
       memberCount: members.length, remindersCount: teamReminders.length, isAdmin: membership.role === 'admin', members, reminders: teamReminders };
   });
 }
 
 export async function createTeam(name: string, description: string) {
   const result = await supabase.rpc('create_team', { team_name: name, team_description: description || null });
+  if (result.error) throw new Error(result.error.message);
+}
+
+export async function deleteTeam(teamId: string) {
+  const result = await supabase.rpc('delete_team', { requested_team_id: teamId });
+  if (result.error) throw new Error(result.error.message);
+}
+
+export async function removeTeamMember(teamId: string, userId: string) {
+  const result = await supabase.rpc('remove_team_member', { requested_team_id: teamId, requested_user_id: userId });
   if (result.error) throw new Error(result.error.message);
 }
 

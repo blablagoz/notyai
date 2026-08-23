@@ -35,7 +35,7 @@ export function AuthScreen({ theme }: { theme: ThemeColors }) {
 
   return <main className="app-shell min-h-[100dvh] flex items-center justify-center p-4" style={{ backgroundColor: theme.bg, color: theme.textPrimary }}>
     <section className="w-full max-w-md rounded-3xl border p-6 shadow-2xl" style={{ backgroundColor: theme.panel, borderColor: theme.border }}>
-      <div className="flex items-center gap-3 mb-6"><div className="w-11 h-11 rounded-2xl flex items-center justify-center font-black" style={{ backgroundColor: theme.accent, color: theme.bg }}>N</div><div><h1 className="text-2xl font-black">NOTY<span style={{ color: theme.accent }}>AI</span></h1><p className="text-xs" style={{ color: theme.textMuted }}>Akıllı ajandanıza güvenli giriş</p></div></div>
+      <div className="mb-6"><h1 className="text-2xl font-black">NOTY<span style={{ color: theme.accent }}>AI</span></h1><p className="text-xs" style={{ color: theme.textMuted }}>Akıllı ajandanıza güvenli giriş</p></div>
       <div className="grid grid-cols-2 gap-1 p-1 rounded-xl mb-5" style={{ backgroundColor: theme.card }}><button onClick={() => setMode('login')} className="py-2 rounded-lg text-xs font-bold" style={{ backgroundColor: mode === 'login' ? theme.accent : 'transparent', color: mode === 'login' ? theme.bg : theme.textMuted }}>Giriş Yap</button><button onClick={() => setMode('signup')} className="py-2 rounded-lg text-xs font-bold" style={{ backgroundColor: mode === 'signup' ? theme.accent : 'transparent', color: mode === 'signup' ? theme.bg : theme.textMuted }}>Kayıt Ol</button></div>
       <form onSubmit={submit} className="space-y-3">
         {mode === 'signup' && <label className="relative block"><User className="absolute left-3 top-3" size={17} color={theme.accent}/><input required value={name} onChange={e => setName(e.target.value)} placeholder="Ad soyad" className="w-full p-3 pl-10 rounded-xl border outline-none text-sm" style={{ backgroundColor: theme.card, borderColor: theme.border, color: theme.textPrimary }}/></label>}
@@ -46,7 +46,7 @@ export function AuthScreen({ theme }: { theme: ThemeColors }) {
       </form>
       <div className="flex items-center gap-3 my-4"><span className="h-px flex-1" style={{ backgroundColor: theme.border }}/><small style={{ color: theme.textMuted }}>veya</small><span className="h-px flex-1" style={{ backgroundColor: theme.border }}/></div>
       <button disabled={googleEnabled === false} onClick={() => signInWithGoogle().catch((e) => setMessage(e.message))} className="w-full py-3 rounded-xl border text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: theme.card, borderColor: theme.border }}><Sparkles size={17} color={theme.accent}/> {googleEnabled === false ? 'Google Girişi Yapılandırılmamış' : 'Google ile Devam Et'}</button>
-      {googleEnabled === false && <p className="mt-2 text-[11px] text-center" style={{ color: theme.textMuted }}>Gmail adresinizle üstteki Kayıt Ol seçeneği çalışır.</p>}
+      {googleEnabled === false && <p className="mt-2 text-[11px] text-center leading-4" style={{ color: theme.textMuted }}>Google hesabıyla giriş için Supabase Google sağlayıcısına Client ID ve Client Secret eklenmesi gerekir. Gmail adresinizle üstteki Kayıt Ol seçeneği çalışır.</p>}
     </section>
   </main>;
 }

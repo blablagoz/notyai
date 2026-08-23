@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Send, X, Keyboard, Sparkles, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Send, X, Keyboard, Sparkles, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ThemeColors } from '../theme';
 import { SoundwaveVisualizer } from './SoundwaveVisualizer';
 import { isNativeAndroid, NativeDevice } from '../services/native';
+import { readQuickCommands, saveQuickCommands } from '../utils/quickCommands';
 
 interface FluidInteractionBarProps {
   theme: ThemeColors;
@@ -24,8 +25,15 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
   const [isListening, setIsListening] = useState(false);
   const [micSupported, setMicSupported] = useState(true);
   const [micError, setMicError] = useState<string | null>(null);
+  const [quickCommands, setQuickCommands] = useState<string[]>(() => readQuickCommands());
+  const [isAddingQuickCommand, setIsAddingQuickCommand] = useState(false);
+  const [quickCommandDraft, setQuickCommandDraft] = useState('');
 
   const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    saveQuickCommands(quickCommands);
+  }, [quickCommands]);
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -131,11 +139,14 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
     }
   };
 
-  const quickPills = [
-    'Yarın 15:00 Kadıköy Noterliği',
-    'Cuma 10:00 Yönetim Toplantısı',
-    'Bugün 18:30 Spor Salonu',
-  ];
+  const addQuickCommand = (event: React.FormEvent) => {
+    event.preventDefault();
+    const command = quickCommandDraft.trim();
+    if (!command) return;
+    setQuickCommands((current) => current.includes(command) ? current : [...current, command]);
+    setQuickCommandDraft('');
+    setIsAddingQuickCommand(false);
+  };
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 pb-4 sm:pb-6 pt-1">
@@ -144,23 +155,56 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
         <span className="text-[11px] font-bold uppercase tracking-wider shrink-0 mr-1" style={{ color: theme.textSubtle }}>
           Hızlı Komutlar:
         </span>
-        {quickPills.map((pill, i) => (
-          <button
-            key={i}
-            id={`quick-pill-${i}`}
-            onClick={() => onSendCommand(pill)}
-            disabled={isProcessingAI}
-            className="text-xs font-semibold px-3 py-1 rounded-full shrink-0 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-            style={{
-              backgroundColor: theme.panel,
-              color: theme.textMuted,
-              border: `1px solid ${theme.border}`,
-            }}
-          >
-            + {pill}
-          </button>
+        {quickCommands.map((command, index) => (
+          <span key={command} className="inline-flex shrink-0 rounded-full overflow-hidden" style={{ border: `1px solid ${theme.border}` }}>
+            <button
+              id={`quick-pill-${index}`}
+              onClick={() => onSendCommand(command)}
+              disabled={isProcessingAI}
+              className="text-xs font-semibold px-3 py-1 transition-all disabled:opacity-50"
+              style={{ backgroundColor: theme.panel, color: theme.textMuted }}
+            >
+              {command}
+            </button>
+            <button
+              type="button"
+              onClick={() => setQuickCommands((current) => current.filter((item) => item !== command))}
+              aria-label={`${command} hızlı komutunu sil`}
+              className="px-2 transition-opacity hover:opacity-70"
+              style={{ backgroundColor: theme.card, color: theme.warning }}
+            >
+              <Trash2 size={12} />
+            </button>
+          </span>
         ))}
+        <button
+          type="button"
+          onClick={() => setIsAddingQuickCommand((current) => !current)}
+          className="inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full shrink-0"
+          style={{ backgroundColor: `${theme.accent}18`, color: theme.accent, border: `1px solid ${theme.accent}50` }}
+        >
+          <Plus size={13} /> Hızlı Komut Ekle
+        </button>
       </div>
+
+      {isAddingQuickCommand && (
+        <form onSubmit={addQuickCommand} className="flex items-center gap-2 mb-2">
+          <input
+            value={quickCommandDraft}
+            onChange={(event) => setQuickCommandDraft(event.target.value)}
+            placeholder="Örn: Yarın 15:00 toplantı"
+            autoFocus
+            className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-xs outline-none"
+            style={{ backgroundColor: theme.panel, borderColor: theme.border, color: theme.textPrimary }}
+          />
+          <button type="submit" disabled={!quickCommandDraft.trim()} className="rounded-xl px-3 py-2 text-xs font-bold disabled:opacity-50" style={{ backgroundColor: theme.accent, color: theme.bg }}>
+            Ekle
+          </button>
+          <button type="button" onClick={() => { setIsAddingQuickCommand(false); setQuickCommandDraft(''); }} aria-label="Hızlı komut eklemeyi kapat" className="p-2 rounded-xl" style={{ color: theme.textMuted }}>
+            <X size={16} />
+          </button>
+        </form>
+      )}
 
       {micError && (
         <div className="mb-2 text-xs p-2 rounded-xl text-amber-300 bg-amber-950/40 border border-amber-500/30 text-center">

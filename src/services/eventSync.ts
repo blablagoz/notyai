@@ -29,6 +29,10 @@ export async function removeEventFromDevice(event: CalendarEvent): Promise<Devic
   }
   if (isNativeAndroid() && event.nativeCalendarEventId) {
     try {
+      const permission = await NativeDevice.requestCalendarPermission();
+      if (!permission.granted) {
+        throw new Error('Takvim erişimi verilmedi. Görevi cihaz takviminden kaldırmak için izni onaylayın.');
+      }
       await NativeDevice.deleteCalendarEvent({ eventId: Number(event.nativeCalendarEventId) });
       result.calendarCleared = true;
     } catch (error: any) {

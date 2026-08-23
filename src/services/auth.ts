@@ -5,16 +5,33 @@ import { oauthRedirectUrl, supabase, supabasePublishableKey, supabaseUrl } from 
 
 let listenerReady = false;
 
+async function handleOAuthDeepLink(url: string) {
+  if (!url.startsWith(oauthRedirectUrl)) return;
+
+  const parsed = new URL(url);
+  const oauthError = parsed.searchParams.get('error_description') || parsed.searchParams.get('error');
+  if (oauthError) throw new Error(oauthError);
+
+  const code = parsed.searchParams.get('code');
+  if (code) {
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) throw error;
+  }
+
+  await Browser.close().catch(() => undefined);
+}
+
 export async function initializeOAuthDeepLinks() {
   if (!Capacitor.isNativePlatform() || listenerReady) return;
   listenerReady = true;
-  await App.addListener('appUrlOpen', async ({ url }) => {
-    if (!url.startsWith(oauthRedirectUrl)) return;
-    const parsed = new URL(url);
-    const code = parsed.searchParams.get('code');
-    if (code) await supabase.auth.exchangeCodeForSession(code);
-    await Browser.close().catch(() => undefined);
+  await App.addListener('appUrlOpen', ({ url }) => {
+    handleOAuthDeepLink(url).catch((error) => console.error('OAuth yönlendirmesi tamamlanamadı:', error));
   });
+
+  // appUrlOpen handles links while the app is alive. getLaunchUrl is also
+  // required when Android starts the app from a completed OAuth redirect.
+  const launch = await App.getLaunchUrl().catch(() => undefined);
+  if (launch?.url) await handleOAuthDeepLink(launch.url);
 }
 
 export async function signInWithGoogle() {

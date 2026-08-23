@@ -15,7 +15,7 @@ import { AppThemeMode, CalendarEvent, TeamModel, FriendShare, NotificationItem, 
 import { themes, ThemeColors } from './theme';
 import { supabase } from './lib/supabase';
 import { initializeOAuthDeepLinks } from './services/auth';
-import { addTeamReminder, createTeam, findProfile, inviteMember, loadEvents, loadInvitations, loadNotifications, loadProfile, loadTeams, markAllNotificationsRead, removeEvent, respondInvitation, saveEvent, updateEvent } from './services/data';
+import { addTeamReminder, createTeam, deleteTeam, findProfile, inviteMember, loadEvents, loadInvitations, loadNotifications, loadProfile, loadTeams, markAllNotificationsRead, removeEvent, removeTeamMember, respondInvitation, saveEvent, updateEvent } from './services/data';
 import { removeEventFromDevice, syncEventToDevice } from './services/eventSync';
 import { AuthScreen } from './components/AuthScreen';
 import { WeeklyFlowBar } from './components/WeeklyFlowBar';
@@ -29,13 +29,14 @@ import { EventModal } from './components/EventModal';
 import { NotificationDrawer } from './components/NotificationDrawer';
 import { TimeFormatPrompt } from './components/TimeFormatPrompt';
 import { readTimeFormatPreference, saveTimeFormatPreference, TimeFormatPreference } from './utils/timeFormat';
+import { ThemeModePrompt } from './components/ThemeModePrompt';
+import { hasSelectedThemePreference, readThemePreference, saveThemePreference } from './utils/themePreference';
+import { PermissionOnboarding } from './components/PermissionOnboarding';
 
 export function App() {
   // Theme state
-  const [themeMode, setThemeMode] = useState<AppThemeMode>(() => {
-    const saved = localStorage.getItem('notyai_theme');
-    return (saved as AppThemeMode) || 'obsidian';
-  });
+  const [themeMode, setThemeMode] = useState<AppThemeMode>(() => readThemePreference());
+  const [isThemePromptOpen, setIsThemePromptOpen] = useState(() => !hasSelectedThemePreference());
 
   const currentTheme: ThemeColors = themes[themeMode];
   const [timeFormat, setTimeFormat] = useState<TimeFormatPreference | null>(() => readTimeFormatPreference());
@@ -76,9 +77,11 @@ export function App() {
     'Gününüzün akışı hazırlandı. Planlarınıza zamanında yetişmeniz için 3 kademeli bildirim mimarisi devrede!'
   );
 
-  useEffect(() => {
-    localStorage.setItem('notyai_theme', themeMode);
-  }, [themeMode]);
+  const handleThemeChange = (mode: AppThemeMode) => {
+    saveThemePreference(mode);
+    setThemeMode(mode);
+    setIsThemePromptOpen(false);
+  };
 
   const refreshData = useCallback(async (activeUserId: string) => {
     setDataError('');
@@ -311,6 +314,18 @@ export function App() {
     if (!userId) return; await createTeam(name, description); await refreshData(userId);
   };
 
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!userId) throw new Error('Oturum bulunamadı.');
+    await deleteTeam(teamId);
+    await refreshData(userId);
+  };
+
+  const handleRemoveTeamMember = async (teamId: string, memberUserId: string) => {
+    if (!userId) throw new Error('Oturum bulunamadı.');
+    await removeTeamMember(teamId, memberUserId);
+    await refreshData(userId);
+  };
+
   // Add Team Reminder
   const handleAddTeamReminder = (
     teamId: string,
@@ -349,7 +364,10 @@ export function App() {
   });
 
   if (authLoading) return <div className="app-shell min-h-[100dvh] flex items-center justify-center" style={{ backgroundColor: currentTheme.bg, color: currentTheme.accent }}>NotyAI yükleniyor…</div>;
-  if (!userId) return <AuthScreen theme={currentTheme} />;
+  if (!userId) return <>
+    <AuthScreen theme={currentTheme} />
+    {isThemePromptOpen && <ThemeModePrompt theme={currentTheme} onSelect={handleThemeChange} />}
+  </>;
 
   return (
     <div
@@ -368,17 +386,7 @@ export function App() {
         }}
       >
         {/* Brand Logo & Name */}
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-          <div
-            className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-2xl flex items-center justify-center font-black tracking-tighter text-lg shadow-lg"
-            style={{
-              backgroundColor: currentTheme.accent,
-              color: currentTheme.bg,
-              boxShadow: `0 0 20px ${currentTheme.accent}40`,
-            }}
-          >
-            N
-          </div>
+        <div className="flex min-w-0 items-center">
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="text-lg sm:text-xl font-black tracking-tight" style={{ color: currentTheme.textPrimary }}>
@@ -629,7 +637,7 @@ export function App() {
       {isSettingsOpen && (
         <SettingsModal
           currentTheme={themeMode}
-          onThemeChange={setThemeMode}
+          onThemeChange={handleThemeChange}
           theme={currentTheme}
           events={events}
           onClose={() => setIsSettingsOpen(false)}
@@ -655,6 +663,10 @@ export function App() {
         />
       )}
 
+      {isThemePromptOpen && <ThemeModePrompt theme={currentTheme} onSelect={handleThemeChange} />}
+
+      {userId && !isThemePromptOpen && timeFormat && <PermissionOnboarding theme={currentTheme} />}
+
       {/* Team Workspace Screen */}
       {isTeamWorkspaceOpen && (
         <TeamWorkspaceScreen
@@ -667,6 +679,8 @@ export function App() {
           onSearchUserByPublicId={findProfile}
           onInviteMember={async (teamId, publicId) => { await inviteMember(teamId, publicId); if (userId) await refreshData(userId); }}
           onRespondInvitation={async (invitationId, accept) => { await respondInvitation(invitationId, accept); if (userId) await refreshData(userId); }}
+          onDeleteTeam={handleDeleteTeam}
+          onRemoveTeamMember={handleRemoveTeamMember}
           onClose={() => setIsTeamWorkspaceOpen(false)}
         />
       )}

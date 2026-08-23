@@ -15,7 +15,7 @@ export interface ThemeColors {
 }
 
 export const themes: Record<AppThemeMode, ThemeColors> = {
-  obsidian: {
+  dark: {
     bg: '#0D1014',
     panel: '#161B22',
     card: '#1C222C',
@@ -27,19 +27,6 @@ export const themes: Record<AppThemeMode, ThemeColors> = {
     textMuted: '#94A3B8',
     textSubtle: '#505E72',
     gradient: 'from-[#00F2DE] to-[#40C8E0]',
-  },
-  petrol: {
-    bg: '#091212',
-    panel: '#10201F',
-    card: '#162A28',
-    border: '#24403D',
-    accent: '#10F0D2',
-    accentSoft: '#FBBF24',
-    warning: '#F472B6',
-    textPrimary: '#F2F8F6',
-    textMuted: '#8CAFAA',
-    textSubtle: '#415F5A',
-    gradient: 'from-[#10F0D2] to-[#FBBF24]',
   },
   light: {
     bg: '#F8FAFC',

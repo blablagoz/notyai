@@ -133,7 +133,7 @@ export function App() {
     const timer = window.setTimeout(() => {
       setAssistantSummary(undefined);
       setLiveTranscript('');
-    }, 4500);
+    }, 2500);
     return () => window.clearTimeout(timer);
   }, [assistantSummary]);
 

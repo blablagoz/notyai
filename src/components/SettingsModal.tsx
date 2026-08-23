@@ -60,9 +60,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="app-modal-layer fixed inset-0 z-50 bg-black/70 flex items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="w-full max-w-lg rounded-3xl border p-6 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="app-modal-panel w-full max-w-lg rounded-3xl border p-4 sm:p-6 shadow-2xl overflow-y-auto animate-in zoom-in-95 duration-200"
         style={{
           backgroundColor: theme.panel,
           borderColor: theme.border,
@@ -154,7 +154,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* 2. Notification Architecture */}
         <div className="mt-6">
           <label className="text-[11px] font-bold tracking-widest uppercase block mb-3" style={{ color: theme.textSubtle }}>
-            BİLDİRİM MİMARİSİ (3 KADEMELİ AKILLI DÖNGÜ)
+            GERÇEK ANDROID ETKİNLİK BİLDİRİMLERİ
           </label>
           <div className="space-y-2.5">
             <div className="p-3.5 rounded-2xl border flex items-center justify-between" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
@@ -164,10 +164,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
-                    Gece 00:00 Günün Özeti
+                    Seçilen Süre Kala Hatırlatma
                   </h4>
                   <p className="text-[11px]" style={{ color: theme.textMuted }}>
-                    Kilit ekranında sabit brifing ve sonraki gün hazırlığı
+                    15 dk, 30 dk, 1 saat, 2 saat veya 1 gün önce
                   </p>
                 </div>
               </div>
@@ -181,10 +181,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
-                    Sabah 07:00 Güne Başlama
+                    Etkinlik Zamanı Bildirimi
                   </h4>
                   <p className="text-[11px]" style={{ color: theme.accent }}>
-                    Yukarıdan düşen sesli banner & motivasyon
+                    Etkinlik başladığı anda Android sistem bildirimi
                   </p>
                 </div>
               </div>
@@ -198,10 +198,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
-                    T-60 Dakika Öncesi Hatırlatıcı
+                    Kesin Alarm ve Yeniden Başlatma Desteği
                   </h4>
                   <p className="text-[11px]" style={{ color: theme.textMuted }}>
-                    Trafik, yol ve hazırlık tampon uyarısı
+                    İzin verildiğinde bekleme modunda zamanında teslim
                   </p>
                 </div>
               </div>
@@ -218,10 +218,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="p-4 rounded-2xl border flex items-center justify-between gap-3" style={{ backgroundColor: theme.card, borderColor: theme.border }}>
             <div>
               <h4 className="text-xs font-bold" style={{ color: theme.textPrimary }}>
-                iCalendar (.ICS) Takvim İçe/Dışa Aktarma
+                Yerel Takvim + iCalendar (.ICS) Dışa Aktarma
               </h4>
               <p className="text-[11px]" style={{ color: theme.textMuted }}>
-                Apple Calendar, Google Takvim, Outlook ve Samsung Takvim ile %100 uyumlu
+                Android CalendarContract uyumlu cihaz takvimlerine doğrudan kayıt eklenir
               </p>
             </div>
 
@@ -245,7 +245,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="flex items-center gap-2">
             <ShieldCheck size={16} style={{ color: theme.accent }} />
             <span className="text-xs font-semibold" style={{ color: theme.textMuted }}>
-              Gemini 2.5 Flash Doğal Dil Motoru Aktif
+              Yerel Türkçe Ses Tanıma ve Güvenli Komut Ayrıştırıcı Aktif
             </span>
           </div>
           <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded" style={{ backgroundColor: `${theme.accent}15`, color: theme.accent }}>

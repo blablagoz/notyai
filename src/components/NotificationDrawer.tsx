@@ -32,7 +32,7 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex justify-end backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="w-full max-w-md h-full p-6 shadow-2xl flex flex-col justify-between border-l overflow-y-auto animate-in slide-in-from-right duration-200"
+        className="app-drawer-panel w-full max-w-md shadow-2xl flex flex-col justify-between border-l overflow-y-auto animate-in slide-in-from-right duration-200"
         style={{
           backgroundColor: theme.panel,
           borderColor: theme.border,

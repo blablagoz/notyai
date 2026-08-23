@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff, Send, X, Keyboard, Sparkles, Loader2 } from 'lucide-react';
 import { ThemeColors } from '../theme';
 import { SoundwaveVisualizer } from './SoundwaveVisualizer';
+import { isNativeAndroid, NativeDevice } from '../services/native';
 
 interface FluidInteractionBarProps {
   theme: ThemeColors;
@@ -28,6 +29,7 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
 
   // Initialize Web Speech API
   useEffect(() => {
+    if (isNativeAndroid()) { setMicSupported(true); return; }
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -87,7 +89,18 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
     }
   };
 
-  const toggleListening = () => {
+  const toggleListening = async () => {
+    if (isNativeAndroid()) {
+      try {
+        setMicError(null); setIsListening(true); onListeningStateChange?.(true);
+        const permission = await NativeDevice.requestMicrophonePermission();
+        if (!permission.granted) throw new Error('Mikrofon izni verilmedi.');
+        const result = await NativeDevice.startSpeechRecognition({ language: 'tr-TR', prompt: 'NotyAI komutunuzu dinliyor', maxResults: 3 });
+        if (!result.cancelled && result.text.trim()) { onLiveTranscriptUpdate?.(result.text); await handleFinalSpeech(result.text); }
+      } catch (error: any) { setMicError(error.message || 'Sesli komut başlatılamadı.'); }
+      finally { setIsListening(false); onListeningStateChange?.(false); }
+      return;
+    }
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
@@ -167,7 +180,7 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
       >
         {isTypingMode ? (
           /* Typing Mode */
-          <form onSubmit={handleTextSubmit} className="flex-1 flex items-center gap-2 px-3">
+          <form onSubmit={handleTextSubmit} className="flex-1 min-w-0 flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
             <input
               id="event-nlp-input"
               type="text"
@@ -175,7 +188,7 @@ export const FluidInteractionBar: React.FC<FluidInteractionBarProps> = ({
               onChange={(e) => setInputText(e.target.value)}
               placeholder="Örn: Yarın 15:00 Kadıköy Noterliği sözleşme randevusu..."
               autoFocus
-              className="flex-1 bg-transparent text-sm sm:text-base outline-none font-medium placeholder:font-normal"
+              className="flex-1 min-w-0 bg-transparent text-sm sm:text-base outline-none font-medium placeholder:font-normal"
               style={{
                 color: theme.textPrimary,
               }}

@@ -7,7 +7,7 @@ interface EventModalProps {
   initialEvent?: CalendarEvent | null;
   defaultDate: Date;
   theme: ThemeColors;
-  onSave: (event: Omit<CalendarEvent, 'id'>) => void;
+  onSave: (event: Omit<CalendarEvent, 'id'>) => Promise<void>;
   onClose: () => void;
 }
 
@@ -45,30 +45,30 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState(
     initialEvent?.reminderMinutesBefore || 60
   );
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const categories = ['Hukuk', 'Resmi', 'Toplantı', 'Spor', 'Sağlık', 'Ders', 'Kişisel', 'Ekip'];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-
-    onSave({
-      title: title.trim(),
-      startTime: new Date(startTime).toISOString(),
-      endTime: new Date(endTime).toISOString(),
-      category,
-      location: location.trim() || undefined,
-      description: description.trim() || undefined,
-      reminderMinutesBefore: Number(reminderMinutesBefore),
-      isCompleted: initialEvent?.isCompleted || false,
-    });
-    onClose();
+    if (new Date(endTime) <= new Date(startTime)) { setError('Bitiş zamanı başlangıçtan sonra olmalıdır.'); return; }
+    setIsSaving(true); setError('');
+    try {
+      await onSave({ title: title.trim(), startTime: new Date(startTime).toISOString(), endTime: new Date(endTime).toISOString(),
+        category, location: location.trim() || undefined, description: description.trim() || undefined,
+        reminderMinutesBefore: Number(reminderMinutesBefore), isCompleted: initialEvent?.isCompleted || false,
+        teamId: initialEvent?.teamId, teamName: initialEvent?.teamName });
+      onClose();
+    } catch (err: any) { setError(err.message || 'Etkinlik kaydedilemedi.'); }
+    finally { setIsSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="app-modal-layer fixed inset-0 z-50 bg-black/70 flex items-center justify-center backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className="w-full max-w-lg rounded-3xl border p-6 shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
+        className="app-modal-panel w-full max-w-lg rounded-3xl border p-4 sm:p-6 shadow-2xl overflow-y-auto animate-in zoom-in-95 duration-200"
         style={{
           backgroundColor: theme.panel,
           borderColor: theme.border,
@@ -215,7 +215,7 @@ export const EventModal: React.FC<EventModalProps> = ({
           {/* Reminder Buffer */}
           <div>
             <label className="block text-xs font-bold mb-1" style={{ color: theme.textMuted }}>
-              HATIRLATICI TAMPONU
+              NE KADAR SÜRE KALA HATIRLATSIN?
             </label>
             <select
               id="event-reminder-select"
@@ -228,10 +228,10 @@ export const EventModal: React.FC<EventModalProps> = ({
                 color: theme.textPrimary,
               }}
             >
-              <option value={15}>T-15 Dakika Önce</option>
-              <option value={30}>T-30 Dakika Önce</option>
-              <option value={60}>T-60 Dakika Önce (Önerilen Yol Tamponu)</option>
-              <option value={120}>T-2 Saat Önce</option>
+              <option value={15}>15 dakika kala</option>
+              <option value={30}>Yarım saat kala</option>
+              <option value={60}>1 saat kala</option>
+              <option value={120}>2 saat kala</option>
               <option value={1440}>1 Gün Önce</option>
             </select>
           </div>
@@ -257,6 +257,7 @@ export const EventModal: React.FC<EventModalProps> = ({
           </div>
 
           {/* Submit */}
+          {error && <p className="text-xs p-3 rounded-xl" style={{ backgroundColor: theme.card, color: theme.warning }}>{error}</p>}
           <div className="flex items-center justify-end gap-2 pt-3 border-t" style={{ borderColor: theme.border }}>
             <button
               type="button"
@@ -271,13 +272,14 @@ export const EventModal: React.FC<EventModalProps> = ({
             <button
               type="submit"
               id="save-event-btn"
-              className="px-6 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+              disabled={isSaving}
+              className="px-6 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-60"
               style={{
                 backgroundColor: theme.accent,
                 color: theme.bg,
               }}
             >
-              {initialEvent ? 'Güncelle' : 'Kaydet & Takvime Ekle'}
+              {isSaving ? 'Kaydediliyor…' : initialEvent ? 'Güncelle' : 'Kaydet & Takvime Ekle'}
             </button>
           </div>
         </form>

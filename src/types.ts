@@ -12,6 +12,32 @@ export interface CalendarEvent {
   isCompleted?: boolean;
   teamId?: string;
   teamName?: string;
+  nativeCalendarEventId?: string;
+  localNotificationId?: number;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName?: string;
+  avatarUrl?: string;
+  publicId: string;
+}
+
+export interface PublicProfile {
+  id: string;
+  publicId: string;
+  fullName?: string;
+  avatarUrl?: string;
+}
+
+export interface TeamInvitation {
+  id: string;
+  teamId: string;
+  teamName: string;
+  inviterName: string;
+  createdAt: string;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
 }
 
 export interface ParsedAIResponse {
@@ -64,7 +90,7 @@ export interface FriendShare {
 
 export interface NotificationItem {
   id: string;
-  type: 'summary' | 'morning' | 'reminder' | 'team';
+  type: 'summary' | 'morning' | 'reminder' | 'team' | 'invite' | 'system';
   title: string;
   subtitle: string;
   time: string;

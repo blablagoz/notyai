@@ -71,16 +71,16 @@ export const WeeklyFlowBar: React.FC<WeeklyFlowBarProps> = ({
 
   return (
     <div className="w-full px-4 sm:px-6 py-2">
-      <div className="flex items-center justify-between mb-2 px-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSubtle }}>
+      <div className="flex items-center justify-between gap-2 mb-2 px-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-[11px] sm:text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSubtle }}>
             Haftalık Akış Çizelgesi
           </span>
           {!isToday(selectedDate) && (
             <button
               id="jump-today-btn"
               onClick={handleJumpToday}
-              className="text-[11px] font-bold px-2 py-0.5 rounded-full transition-colors"
+              className="shrink-0 text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full transition-colors"
               style={{
                 backgroundColor: `${theme.accent}20`,
                 color: theme.accent,

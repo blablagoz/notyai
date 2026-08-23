@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import { Users, Plus, Shield, ShieldAlert, Calendar, UserPlus, Eye, BellPlus, CheckCircle, Clock } from 'lucide-react';
 import { ThemeColors } from '../theme';
-import { TeamModel, TeamReminder, FriendShare } from '../types';
+import { TeamModel, TeamReminder, FriendShare, PublicProfile, TeamInvitation } from '../types';
 
 interface TeamWorkspaceScreenProps {
   theme: ThemeColors;
   teams: TeamModel[];
   friends: FriendShare[];
+  pendingInvitations: TeamInvitation[];
   onCreateTeam: (name: string, description: string) => void;
   onAddTeamReminder: (teamId: string, reminder: Omit<TeamReminder, 'id' | 'teamId' | 'createdBy' | 'createdByName'>) => void;
+  onSearchUserByPublicId: (id: string) => Promise<PublicProfile | null>;
+  onInviteMember: (teamId: string, publicId: string) => Promise<void>;
+  onRespondInvitation: (invitationId: string, accept: boolean) => Promise<void>;
   onClose: () => void;
 }
 
@@ -16,8 +20,12 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
   theme,
   teams,
   friends,
+  pendingInvitations,
   onCreateTeam,
   onAddTeamReminder,
+  onSearchUserByPublicId,
+  onInviteMember,
+  onRespondInvitation,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<'teams' | 'friends'>('teams');
@@ -34,6 +42,26 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
 
   // Search friends
   const [friendSearch, setFriendSearch] = useState('');
+  const [selectedTeamForInvite, setSelectedTeamForInvite] = useState<TeamModel | null>(null);
+  const [publicIdSearch, setPublicIdSearch] = useState('');
+  const [foundProfile, setFoundProfile] = useState<PublicProfile | null>(null);
+  const [inviteStatus, setInviteStatus] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+
+  const searchMember = async () => {
+    setInviteBusy(true); setInviteStatus(''); setFoundProfile(null);
+    try { const profile = await onSearchUserByPublicId(publicIdSearch); setFoundProfile(profile); if (!profile) setInviteStatus('Bu kullanıcı ID’si bulunamadı.'); }
+    catch (error: any) { setInviteStatus(error.message || 'Arama tamamlanamadı.'); }
+    finally { setInviteBusy(false); }
+  };
+
+  const sendInvite = async () => {
+    if (!selectedTeamForInvite || !foundProfile) return;
+    setInviteBusy(true);
+    try { await onInviteMember(selectedTeamForInvite.id, foundProfile.publicId); setInviteStatus('Davet gönderildi. Üyelik, karşı taraf kabul ettiğinde başlayacak.'); setFoundProfile(null); }
+    catch (error: any) { setInviteStatus(error.message || 'Davet gönderilemedi.'); }
+    finally { setInviteBusy(false); }
+  };
 
   const handleCreateTeamSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,26 +103,26 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto flex flex-col backdrop-blur-xl animate-in fade-in duration-200"
+      className="app-fullscreen-layer fixed inset-0 z-50 overflow-y-auto flex flex-col backdrop-blur-xl animate-in fade-in duration-200"
       style={{ backgroundColor: `${theme.bg}FA` }}
     >
       {/* Top Header */}
       <div
-        className="sticky top-0 z-10 px-6 py-4 border-b flex items-center justify-between backdrop-blur-md"
+        className="sticky top-0 z-10 px-3 sm:px-6 py-3 sm:py-4 border-b flex items-center justify-between gap-2 backdrop-blur-md"
         style={{ backgroundColor: `${theme.panel}E6`, borderColor: theme.border }}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <div
             className="p-2.5 rounded-2xl flex items-center justify-center"
             style={{ backgroundColor: `${theme.accent}20`, color: theme.accent }}
           >
             <Users size={24} />
           </div>
-          <div>
-            <h2 className="text-xl font-bold tracking-tight" style={{ color: theme.textPrimary }}>
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-xl font-bold tracking-tight truncate" style={{ color: theme.textPrimary }}>
               Ekip & Ortak Çalışma Alanı
             </h2>
-            <p className="text-xs font-medium" style={{ color: theme.textMuted }}>
+            <p className="hidden sm:block text-xs font-medium" style={{ color: theme.textMuted }}>
               Rol tabanlı takvim koordinasyonu, ortak görevler ve arkadaş akışı
             </p>
           </div>
@@ -103,7 +131,7 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
         <button
           id="close-team-screen-btn"
           onClick={onClose}
-          className="px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+          className="shrink-0 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
           style={{ backgroundColor: theme.card, color: theme.textPrimary, border: `1px solid ${theme.border}` }}
         >
           Kapat
@@ -112,11 +140,11 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
 
       <div className="max-w-4xl w-full mx-auto p-4 sm:p-6 flex-1 flex flex-col">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl mb-6 self-start" style={{ backgroundColor: theme.panel, border: `1px solid ${theme.border}` }}>
+        <div className="flex w-full sm:w-auto items-center gap-1 sm:gap-2 p-1.5 rounded-2xl mb-6 self-start" style={{ backgroundColor: theme.panel, border: `1px solid ${theme.border}` }}>
           <button
             id="tab-teams-btn"
             onClick={() => setActiveTab('teams')}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-5 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
             style={{
               backgroundColor: activeTab === 'teams' ? theme.accent : 'transparent',
               color: activeTab === 'teams' ? theme.bg : theme.textMuted,
@@ -128,7 +156,7 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
           <button
             id="tab-friends-btn"
             onClick={() => setActiveTab('friends')}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all"
+            className="flex flex-1 sm:flex-none items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-5 py-2.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all"
             style={{
               backgroundColor: activeTab === 'friends' ? theme.accent : 'transparent',
               color: activeTab === 'friends' ? theme.bg : theme.textMuted,
@@ -142,6 +170,13 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
         {/* Tab 1: Teams */}
         {activeTab === 'teams' && (
           <div className="space-y-6">
+            {pendingInvitations.length > 0 && <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.accent }}>Bekleyen Ekip Davetleri</h3>
+              {pendingInvitations.map(invite => <div key={invite.id} className="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ backgroundColor: theme.panel, borderColor: theme.border }}>
+                <div><strong className="text-sm" style={{ color: theme.textPrimary }}>{invite.teamName}</strong><p className="text-xs" style={{ color: theme.textMuted }}>{invite.inviterName} sizi bu ekibe davet etti.</p></div>
+                <div className="flex gap-2"><button onClick={() => onRespondInvitation(invite.id, false)} className="px-3 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: theme.card, color: theme.textMuted }}>Reddet</button><button onClick={() => onRespondInvitation(invite.id, true)} className="px-3 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: theme.accent, color: theme.bg }}>Kabul Et</button></div>
+              </div>)}
+            </div>}
             {/* Create Team CTA */}
             <div className="flex items-center justify-between gap-4 p-4 rounded-2xl border" style={{ backgroundColor: theme.panel, borderColor: theme.border }}>
               <div>
@@ -233,12 +268,17 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
                   </div>
 
                   {/* Team Actions */}
-                  <div className="flex items-center gap-2 pt-3 border-t" style={{ borderColor: theme.border }}>
+                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t" style={{ borderColor: theme.border }}>
                     {team.isAdmin && (
-                      <button
+                      <><button
+                        id={`team-add-member-${team.id}`}
+                        onClick={() => { setSelectedTeamForInvite(team); setPublicIdSearch(''); setFoundProfile(null); setInviteStatus(''); }}
+                        className="flex-1 min-w-[8rem] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold"
+                        style={{ backgroundColor: theme.panel, color: theme.textPrimary, border: `1px solid ${theme.border}` }}
+                      ><UserPlus size={14}/><span>Yeni Üye Ekle</span></button><button
                         id={`team-add-task-${team.id}`}
                         onClick={() => setSelectedTeamForTask(team)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-colors"
+                        className="flex-1 min-w-[8rem] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-colors"
                         style={{
                           backgroundColor: `${theme.accent}15`,
                           color: theme.accent,
@@ -247,14 +287,14 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
                       >
                         <BellPlus size={14} />
                         <span>Ekibe Görev Ata</span>
-                      </button>
+                      </button></>
                     )}
                     <button
                       id={`team-view-feed-${team.id}`}
                       onClick={() => {
                         alert(`"${team.name}" ekibinin tüm görevleri ana akışınıza otomatik yansıtılmıştır.`);
                       }}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-colors"
+                      className="flex-1 min-w-[8rem] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold transition-colors"
                       style={{
                         backgroundColor: theme.panel,
                         color: theme.textPrimary,
@@ -399,10 +439,21 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
       </div>
 
       {/* Create Team Modal */}
+      {selectedTeamForInvite && <div className="app-modal-layer fixed inset-0 z-60 bg-black/70 flex items-center justify-center">
+        <div className="app-modal-panel w-full max-w-md p-5 rounded-3xl border shadow-2xl" style={{ backgroundColor: theme.panel, borderColor: theme.border }}>
+          <h3 className="text-lg font-bold" style={{ color: theme.textPrimary }}>Yeni Üye Ekle</h3>
+          <p className="text-xs mb-4" style={{ color: theme.textMuted }}>{selectedTeamForInvite.name} ekibine kullanıcının NotyAI ID’siyle davet gönderin.</p>
+          <div className="flex gap-2"><input value={publicIdSearch} onChange={e => setPublicIdSearch(e.target.value.toUpperCase())} placeholder="NTY-XXXXXXXXXXXX" className="min-w-0 flex-1 p-3 rounded-xl border text-sm outline-none" style={{ backgroundColor: theme.card, borderColor: theme.border, color: theme.textPrimary }}/><button disabled={inviteBusy || !publicIdSearch.trim()} onClick={searchMember} className="px-4 rounded-xl text-xs font-bold disabled:opacity-50" style={{ backgroundColor: theme.accent, color: theme.bg }}>Bul</button></div>
+          {foundProfile && <div className="mt-3 p-3 rounded-xl border" style={{ backgroundColor: theme.card, borderColor: theme.border }}><strong className="text-sm" style={{ color: theme.textPrimary }}>{foundProfile.fullName || 'NotyAI Kullanıcısı'}</strong><p className="text-xs font-mono" style={{ color: theme.accent }}>{foundProfile.publicId}</p><button disabled={inviteBusy} onClick={sendInvite} className="w-full mt-3 py-2 rounded-xl text-xs font-bold" style={{ backgroundColor: theme.accent, color: theme.bg }}>Davet Gönder</button></div>}
+          {inviteStatus && <p className="mt-3 text-xs" style={{ color: theme.warning }}>{inviteStatus}</p>}
+          <button onClick={() => setSelectedTeamForInvite(null)} className="w-full mt-4 py-2 rounded-xl text-xs font-bold" style={{ color: theme.textMuted }}>Kapat</button>
+        </div>
+      </div>}
+
       {showCreateTeamModal && (
-        <div className="fixed inset-0 z-60 bg-black/70 flex items-center justify-center p-4">
+        <div className="app-modal-layer fixed inset-0 z-60 bg-black/70 flex items-center justify-center">
           <div
-            className="w-full max-w-md p-6 rounded-3xl border shadow-2xl animate-in zoom-in-95 duration-200"
+            className="app-modal-panel w-full max-w-md p-4 sm:p-6 rounded-3xl border shadow-2xl overflow-y-auto animate-in zoom-in-95 duration-200"
             style={{ backgroundColor: theme.panel, borderColor: theme.border }}
           >
             <h3 className="text-lg font-bold mb-2" style={{ color: theme.textPrimary }}>
@@ -470,9 +521,9 @@ export const TeamWorkspaceScreen: React.FC<TeamWorkspaceScreenProps> = ({
 
       {/* Broadcast Task Modal */}
       {selectedTeamForTask && (
-        <div className="fixed inset-0 z-60 bg-black/70 flex items-center justify-center p-4">
+        <div className="app-modal-layer fixed inset-0 z-60 bg-black/70 flex items-center justify-center">
           <div
-            className="w-full max-w-md p-6 rounded-3xl border shadow-2xl animate-in zoom-in-95 duration-200"
+            className="app-modal-panel w-full max-w-md p-4 sm:p-6 rounded-3xl border shadow-2xl overflow-y-auto animate-in zoom-in-95 duration-200"
             style={{ backgroundColor: theme.panel, borderColor: theme.border }}
           >
             <h3 className="text-lg font-bold mb-1" style={{ color: theme.textPrimary }}>

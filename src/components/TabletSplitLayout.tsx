@@ -119,7 +119,7 @@ export const TabletSplitLayout: React.FC<TabletSplitLayoutProps> = ({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col md:flex-row overflow-hidden">
+    <div className="w-full min-w-0 min-h-0 flex-1 flex flex-col md:flex-row overflow-hidden">
       {/* ==================================================== */}
       {/* LEFT PANEL (Master - %36 Genişlik): Mini Takvim & Brifing */}
       {/* ==================================================== */}
@@ -365,7 +365,7 @@ export const TabletSplitLayout: React.FC<TabletSplitLayoutProps> = ({
         </div>
 
         {/* Bottom Fluid Interaction Bar */}
-        <div className="absolute bottom-0 left-0 right-0 z-20">
+        <div className="app-command-dock absolute bottom-0 left-0 right-0 z-20">
           <FluidInteractionBar
             theme={theme}
             isProcessingAI={isProcessingAI}

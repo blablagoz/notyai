@@ -22,7 +22,7 @@ export const LiveTranscriptOverlay: React.FC<LiveTranscriptOverlayProps> = ({
   }
 
   return (
-    <div className="fixed top-20 left-4 right-4 sm:left-auto sm:right-6 sm:w-96 z-40 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
+    <div className="fixed top-[calc(5rem+env(safe-area-inset-top,0px))] left-[max(1rem,env(safe-area-inset-left,0px))] right-[max(1rem,env(safe-area-inset-right,0px))] sm:left-auto sm:right-[max(1.5rem,env(safe-area-inset-right,0px))] sm:w-96 z-40 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
       <div
         className="p-4 sm:p-5 rounded-2xl shadow-2xl backdrop-blur-md"
         style={{

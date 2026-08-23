@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Sparkles,
   Settings,
@@ -9,15 +9,15 @@ import {
   Smartphone,
   Calendar as CalendarIcon,
   CheckCircle2,
+  LogOut,
 } from 'lucide-react';
-import { AppThemeMode, CalendarEvent, TeamModel, FriendShare, NotificationItem } from './types';
+import { AppThemeMode, CalendarEvent, TeamModel, FriendShare, NotificationItem, TeamInvitation, UserProfile } from './types';
 import { themes, ThemeColors } from './theme';
-import {
-  getInitialEvents,
-  initialTeams,
-  initialFriends,
-  initialNotifications,
-} from './data/initialData';
+import { supabase } from './lib/supabase';
+import { initializeOAuthDeepLinks } from './services/auth';
+import { addTeamReminder, createTeam, findProfile, inviteMember, loadEvents, loadInvitations, loadNotifications, loadProfile, loadTeams, markAllNotificationsRead, removeEvent, respondInvitation, saveEvent, updateEvent } from './services/data';
+import { removeEventFromDevice, syncEventToDevice } from './services/eventSync';
+import { AuthScreen } from './components/AuthScreen';
 import { WeeklyFlowBar } from './components/WeeklyFlowBar';
 import { TimelineEventItem } from './components/TimelineEventItem';
 import { FluidInteractionBar } from './components/FluidInteractionBar';
@@ -37,47 +37,15 @@ export function App() {
 
   const currentTheme: ThemeColors = themes[themeMode];
 
-  // Events state
-  const [events, setEvents] = useState<CalendarEvent[]>(() => {
-    const saved = localStorage.getItem('notyai_events');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return getInitialEvents();
-      }
-    }
-    return getInitialEvents();
-  });
-
-  // Teams state
-  const [teams, setTeams] = useState<TeamModel[]>(() => {
-    const saved = localStorage.getItem('notyai_teams');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return initialTeams;
-      }
-    }
-    return initialTeams;
-  });
-
-  // Friends state
-  const [friends] = useState<FriendShare[]>(initialFriends);
-
-  // Notifications state
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    const saved = localStorage.getItem('notyai_notifications');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return initialNotifications;
-      }
-    }
-    return initialNotifications;
-  });
+  const [authLoading, setAuthLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [teams, setTeams] = useState<TeamModel[]>([]);
+  const [friends] = useState<FriendShare[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<TeamInvitation[]>([]);
+  const [dataError, setDataError] = useState('');
 
   // Active selected date
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -105,61 +73,60 @@ export function App() {
     'Gününüzün akışı hazırlandı. Planlarınıza zamanında yetişmeniz için 3 kademeli bildirim mimarisi devrede!'
   );
 
-  // Save to localStorage
   useEffect(() => {
     localStorage.setItem('notyai_theme', themeMode);
   }, [themeMode]);
 
-  useEffect(() => {
-    localStorage.setItem('notyai_events', JSON.stringify(events));
-  }, [events]);
+  const refreshData = useCallback(async (activeUserId: string) => {
+    try {
+      setDataError('');
+      const [nextProfile, nextEvents, nextTeams, nextInvites, nextNotifications] = await Promise.all([
+        loadProfile(activeUserId), loadEvents(), loadTeams(), loadInvitations(), loadNotifications(),
+      ]);
+      setProfile(nextProfile); setEvents(nextEvents); setTeams(nextTeams);
+      setPendingInvitations(nextInvites); setNotifications(nextNotifications);
+    } catch (error: any) { setDataError(error.message || 'Veriler eşitlenemedi.'); }
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem('notyai_teams', JSON.stringify(teams));
-  }, [teams]);
+    initializeOAuthDeepLinks();
+    supabase.auth.getSession().then(({ data }) => {
+      const id = data.session?.user.id || null; setUserId(id); setAuthLoading(false); if (id) refreshData(id);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const id = session?.user.id || null; setUserId(id); setAuthLoading(false);
+      if (id) refreshData(id); else { setProfile(null); setEvents([]); setTeams([]); setPendingInvitations([]); }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [refreshData]);
 
   useEffect(() => {
-    localStorage.setItem('notyai_notifications', JSON.stringify(notifications));
-  }, [notifications]);
+    if (!userId) return;
+    const channel = supabase.channel(`notyai-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `user_id=eq.${userId}` }, () => refreshData(userId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_invitations', filter: `invitee_id=eq.${userId}` }, () => refreshData(userId))
+      .subscribe();
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshData(userId); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { document.removeEventListener('visibilitychange', onVisible); supabase.removeChannel(channel); };
+  }, [userId, refreshData]);
 
   // Sync window resize for layout
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024 && !isSplitLayout) {
-        setIsSplitLayout(true);
+      if (window.innerWidth < 1024) {
+        setIsSplitLayout(false);
       }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [isSplitLayout]);
+  }, []);
 
-  // Fetch daily briefing when date changes
+  // Daily briefing remains local so APK does not depend on an unavailable localhost API.
   useEffect(() => {
-    const fetchBriefing = async () => {
-      try {
-        const dayEvents = events.filter((e) => isSameDay(new Date(e.startTime), selectedDate));
-        const dateStr = selectedDate.toLocaleDateString('tr-TR', {
-          day: 'numeric',
-          month: 'long',
-          weekday: 'long',
-        });
-
-        const res = await fetch('/api/daily-briefing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ events: dayEvents, dateStr }),
-        });
-        const data = await res.json();
-        if (data?.briefing) {
-          setDailyBriefing(data.briefing);
-        }
-      } catch (err) {
-        console.warn('Briefing error:', err);
-      }
-    };
-
-    fetchBriefing();
-  }, [selectedDate, events.length]);
+    const count = events.filter((e) => isSameDay(new Date(e.startTime), selectedDate)).length;
+    setDailyBriefing(count ? `Bugün ${count} etkinliğiniz var. Takvim ve bildirimleriniz cihazınızla eşitlendi.` : 'Bugün için planlanmış etkinliğiniz yok.');
+  }, [selectedDate, events]);
 
   const isSameDay = (d1: Date, d2: Date) => {
     return (
@@ -170,31 +137,26 @@ export function App() {
   };
 
   // Toggle event completion
-  const handleToggleComplete = (id: string) => {
-    setEvents((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, isCompleted: !e.isCompleted } : e))
-    );
+  const handleToggleComplete = async (id: string) => {
+    const current = events.find((e) => e.id === id); if (!current) return;
+    await updateEvent(id, { is_completed: !current.isCompleted });
+    setEvents((prev) => prev.map((e) => e.id === id ? { ...e, isCompleted: !e.isCompleted } : e));
   };
 
   // Delete event
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
+    const current = events.find((e) => e.id === id); if (!current) return;
+    await removeEventFromDevice(current); await removeEvent(id);
     setEvents((prev) => prev.filter((e) => e.id !== id));
   };
 
   // Reschedule event by hours
-  const handleRescheduleEvent = (id: string, hours: number) => {
-    setEvents((prev) =>
-      prev.map((e) => {
-        if (e.id === id) {
-          const s = new Date(e.startTime);
-          const end = new Date(e.endTime);
-          s.setHours(s.getHours() + hours);
-          end.setHours(end.getHours() + hours);
-          return { ...e, startTime: s.toISOString(), endTime: end.toISOString() };
-        }
-        return e;
-      })
-    );
+  const handleRescheduleEvent = async (id: string, hours: number) => {
+    const current = events.find((e) => e.id === id); if (!current) return;
+    const shifted = { ...current, startTime: new Date(new Date(current.startTime).getTime() + hours * 3600000).toISOString(), endTime: new Date(new Date(current.endTime).getTime() + hours * 3600000).toISOString() };
+    const native: Partial<CalendarEvent> = await syncEventToDevice(shifted).catch(() => ({}));
+    await updateEvent(id, { start_time: shifted.startTime, end_time: shifted.endTime, native_calendar_event_id: native.nativeCalendarEventId || null, local_notification_id: native.localNotificationId ?? null });
+    setEvents((prev) => prev.map((e) => e.id === id ? { ...shifted, ...native } : e));
     setAssistantSummary(`Etkinlik ${hours} saat sonraya ötelendi.`);
   };
 
@@ -204,6 +166,8 @@ export function App() {
     setLiveTranscript(commandText);
 
     try {
+      // Mobil APK localhost sunucusuna bağlı değildir; komutu güvenli yerel ayrıştırıcı işler.
+      throw new Error('local-parser');
       const response = await fetch('/api/parse-event', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -258,8 +222,12 @@ export function App() {
     } catch (err: any) {
       console.error('NLP Command error:', err);
       // Fallback manual event creation
+      const normalized = commandText.toLocaleLowerCase('tr-TR');
       const start = new Date(selectedDate);
-      start.setHours(start.getHours() + 1, 0, 0, 0);
+      if (normalized.includes('yarın')) start.setDate(start.getDate() + 1);
+      const spokenTime = normalized.match(/(?:saat\s*)?(\d{1,2})[.:](\d{2})/);
+      if (spokenTime) start.setHours(Number(spokenTime[1]), Number(spokenTime[2]), 0, 0);
+      else start.setHours(new Date().getHours() + 1, 0, 0, 0);
       const end = new Date(start.getTime() + 3600000);
 
       const fallbackEv: CalendarEvent = {
@@ -271,7 +239,14 @@ export function App() {
         category: 'Genel',
         isCompleted: false,
       };
-      setEvents((prev) => [...prev, fallbackEv]);
+      if (!userId) throw new Error('Oturum bulunamadı.');
+      const stored = await saveEvent(userId, fallbackEv);
+      const native: Partial<CalendarEvent> = await syncEventToDevice(stored).catch(() => ({}));
+      if (native.nativeCalendarEventId || native.localNotificationId) {
+        await updateEvent(stored.id, { native_calendar_event_id: native.nativeCalendarEventId || null, local_notification_id: native.localNotificationId ?? null });
+      }
+      setEvents((prev) => [...prev, { ...stored, ...native }]);
+      setSelectedDate(new Date(stored.startTime));
       setAssistantSummary(`Takvime eklendi: ${commandText}`);
     } finally {
       setIsProcessingAI(false);
@@ -283,19 +258,8 @@ export function App() {
   };
 
   // Create Team
-  const handleCreateTeam = (name: string, description: string) => {
-    const newTeam: TeamModel = {
-      id: `team-${Date.now()}`,
-      name,
-      description,
-      role: 'admin',
-      memberCount: 1,
-      remindersCount: 0,
-      isAdmin: true,
-      members: [{ id: 'me', name: 'Siz (Kurucu & Yönetici)', role: 'Yönetici (Admin)', avatar: 'ME' }],
-      reminders: [],
-    };
-    setTeams((prev) => [...prev, newTeam]);
+  const handleCreateTeam = async (name: string, description: string) => {
+    if (!userId) return; await createTeam(name, description); await refreshData(userId);
   };
 
   // Add Team Reminder
@@ -310,55 +274,20 @@ export function App() {
       location?: string;
     }
   ) => {
-    const team = teams.find((t) => t.id === teamId);
-    const newReminder = {
-      id: `tr-${Date.now()}`,
-      teamId,
-      title: reminderData.title,
-      description: reminderData.description,
-      startTime: reminderData.startTime,
-      endTime: reminderData.endTime,
-      category: reminderData.category,
-      location: reminderData.location,
-      createdBy: 'me',
-      createdByName: 'Av. Avni Kavalcı',
-    };
-
-    setTeams((prev) =>
-      prev.map((t) => (t.id === teamId ? { ...t, reminders: [...t.reminders, newReminder] } : t))
-    );
-
-    // Also reflect into user's own calendar events
-    const newEv: CalendarEvent = {
-      id: `ev-team-${Date.now()}`,
-      title: reminderData.title,
-      startTime: reminderData.startTime,
-      endTime: reminderData.endTime,
-      reminderMinutesBefore: 60,
-      category: reminderData.category,
-      location: reminderData.location,
-      description: `[Ekip Görevi - ${team?.name || 'Ekip'}] ${reminderData.description || ''}`,
-      isCompleted: false,
-      teamId,
-      teamName: team?.name,
-    };
-    setEvents((prev) => [...prev, newEv]);
+    if (!userId) return;
+    addTeamReminder(userId, teamId, reminderData).then(() => refreshData(userId)).catch((e) => setDataError(e.message));
   };
 
   // Save manual event
-  const handleSaveManualEvent = (eventData: Omit<CalendarEvent, 'id'>) => {
-    if (editingEvent) {
-      setEvents((prev) =>
-        prev.map((e) => (e.id === editingEvent.id ? { ...eventData, id: editingEvent.id } : e))
-      );
-      setEditingEvent(null);
-    } else {
-      const newEv: CalendarEvent = {
-        ...eventData,
-        id: `ev-${Date.now()}`,
-      };
-      setEvents((prev) => [...prev, newEv]);
-    }
+  const handleSaveManualEvent = async (eventData: Omit<CalendarEvent, 'id'>) => {
+    if (!userId) throw new Error('Lütfen yeniden giriş yapın.');
+    const previous = editingEvent;
+    const stored = await saveEvent(userId, eventData, previous?.id);
+    const native: Partial<CalendarEvent> = await syncEventToDevice({ ...stored, nativeCalendarEventId: previous?.nativeCalendarEventId, localNotificationId: previous?.localNotificationId }).catch((error) => { setDataError(`Etkinlik kaydedildi; cihaz senkronu yapılamadı: ${error.message}`); return {}; });
+    if (native.nativeCalendarEventId || native.localNotificationId) await updateEvent(stored.id, { native_calendar_event_id: native.nativeCalendarEventId || null, local_notification_id: native.localNotificationId ?? null });
+    const complete = { ...stored, ...native };
+    setEvents((items) => previous ? items.map((item) => item.id === previous.id ? complete : item) : [...items, complete]);
+    setEditingEvent(null);
   };
 
   const dayEvents = events.filter((e) => isSameDay(new Date(e.startTime), selectedDate));
@@ -370,9 +299,12 @@ export function App() {
     weekday: 'long',
   });
 
+  if (authLoading) return <div className="app-shell min-h-[100dvh] flex items-center justify-center" style={{ backgroundColor: currentTheme.bg, color: currentTheme.accent }}>NotyAI yükleniyor…</div>;
+  if (!userId) return <AuthScreen theme={currentTheme} />;
+
   return (
     <div
-      className="min-h-screen flex flex-col transition-colors duration-300 font-sans selection:bg-cyan-500/30"
+      className="app-shell flex flex-col transition-colors duration-300 font-sans selection:bg-cyan-500/30"
       style={{
         backgroundColor: currentTheme.bg,
         color: currentTheme.textPrimary,
@@ -380,16 +312,16 @@ export function App() {
     >
       {/* Top Main Navigation Bar */}
       <header
-        className="sticky top-0 z-30 px-4 sm:px-6 py-3 border-b flex items-center justify-between backdrop-blur-md"
+        className="app-topbar sticky top-0 z-30 py-3 border-b flex items-center justify-between gap-2 backdrop-blur-md"
         style={{
           backgroundColor: `${currentTheme.panel}E6`,
           borderColor: currentTheme.border,
         }}
       >
         {/* Brand Logo & Name */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <div
-            className="w-10 h-10 rounded-2xl flex items-center justify-center font-black tracking-tighter text-lg shadow-lg"
+            className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-2xl flex items-center justify-center font-black tracking-tighter text-lg shadow-lg"
             style={{
               backgroundColor: currentTheme.accent,
               color: currentTheme.bg,
@@ -404,7 +336,7 @@ export function App() {
                 NOTY<span style={{ color: currentTheme.accent }}>AI</span>
               </h1>
               <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+                className="app-pro-badge text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
                 style={{
                   backgroundColor: `${currentTheme.accent}20`,
                   color: currentTheme.accent,
@@ -414,7 +346,7 @@ export function App() {
               </span>
             </div>
             <p className="text-[11px] font-medium hidden sm:block" style={{ color: currentTheme.textSubtle }}>
-              Ses Odaklı Akıllı Ajanda & Yerel Takvim
+              {profile?.publicId || 'Ses Odaklı Akıllı Ajanda & Yerel Takvim'}
             </p>
           </div>
         </div>
@@ -433,7 +365,7 @@ export function App() {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           {/* Notifications Button with Badge */}
           <button
             id="notifications-btn"
@@ -477,7 +409,7 @@ export function App() {
             id="toggle-layout-btn"
             onClick={() => setIsSplitLayout(!isSplitLayout)}
             title={isSplitLayout ? 'Mobil Tek Akış Görünümü' : 'Geniş Panel / Tablet Görünümü'}
-            className="p-2.5 rounded-2xl transition-all hover:scale-105"
+            className="hidden lg:block p-2.5 rounded-2xl transition-all hover:scale-105"
             style={{
               backgroundColor: currentTheme.card,
               color: isSplitLayout ? currentTheme.accent : currentTheme.textMuted,
@@ -519,8 +451,11 @@ export function App() {
           >
             <Settings size={18} />
           </button>
+          <button onClick={() => supabase.auth.signOut()} aria-label="Çıkış yap" className="p-2.5 rounded-2xl" style={{ backgroundColor: currentTheme.card, color: currentTheme.textMuted, border: `1px solid ${currentTheme.border}` }}><LogOut size={18}/></button>
         </div>
       </header>
+
+      {dataError && <button onClick={() => setDataError('')} className="mx-4 mt-2 p-2 rounded-xl text-xs text-left" style={{ backgroundColor: currentTheme.card, color: currentTheme.warning }}>{dataError}</button>}
 
       {/* Live Transcript & Processing Status Overlay */}
       <LiveTranscriptOverlay
@@ -552,7 +487,7 @@ export function App() {
           }}
         />
       ) : (
-        <main className="flex-1 flex flex-col max-w-3xl w-full mx-auto pb-28">
+        <main className="app-mobile-content flex-1 flex flex-col max-w-3xl w-full min-w-0 mx-auto">
           {/* Weekly Interactive Flow Bar */}
           <WeeklyFlowBar
             selectedDate={selectedDate}
@@ -628,7 +563,7 @@ export function App() {
           </div>
 
           {/* Pinned Bottom Fluid Interaction Bar */}
-          <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-auto">
+          <div className="app-command-dock fixed bottom-0 left-0 right-0 z-30 pointer-events-auto">
             <FluidInteractionBar
               theme={currentTheme}
               isProcessingAI={isProcessingAI}
@@ -657,8 +592,12 @@ export function App() {
           theme={currentTheme}
           teams={teams}
           friends={friends}
+          pendingInvitations={pendingInvitations}
           onCreateTeam={handleCreateTeam}
           onAddTeamReminder={handleAddTeamReminder}
+          onSearchUserByPublicId={findProfile}
+          onInviteMember={async (teamId, publicId) => { await inviteMember(teamId, publicId); if (userId) await refreshData(userId); }}
+          onRespondInvitation={async (invitationId, accept) => { await respondInvitation(invitationId, accept); if (userId) await refreshData(userId); }}
           onClose={() => setIsTeamWorkspaceOpen(false)}
         />
       )}
@@ -683,6 +622,7 @@ export function App() {
           notifications={notifications}
           theme={currentTheme}
           onMarkAllRead={() => {
+            markAllNotificationsRead().catch((e) => setDataError(e.message));
             setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
           }}
           onClose={() => setIsNotificationOpen(false)}
